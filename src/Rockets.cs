@@ -13,9 +13,21 @@ internal static class Rockets
 	private static float _retryAt;
 	private static bool _logged;
 	private static int _launchLog;
-	internal static int AmmoId = -1;
+	// The main gun loads 105 mm shells (our own item, src/Bundled.cs). The game's recoilless
+	// rockets are only used if the shell item failed to load (and MainGun.RocketsIfNoShells is on).
+	internal static int RocketAmmoId = -1;
 	internal static int LauncherId = -1;
-	internal static string AmmoName = "rockets";
+	internal static string RocketName = "rockets";
+	internal static int AmmoId
+	{
+		get
+		{
+			int s = Bundled.ShellId();
+			if (s > 0) return s;
+			return TankPlugin.RocketsIfNoShells.Value ? RocketAmmoId : -1;
+		}
+	}
+	internal static string AmmoName => Bundled.ShellId() > 0 ? "105 mm Tank Shells" : RocketName;
 	internal static string FireClipName;
 	internal static ItemAttr_RangedWeapon Launcher;
 	private static float _speed = 40f;
@@ -47,15 +59,15 @@ internal static class Rockets
 				if (rr == null) { try { rr = go.GetComponentInChildren<RecoillessRound>(true); } catch { } }
 				if (rr == null) continue;
 				_prefab = go;
-				AmmoId = w.ammoId;
+				RocketAmmoId = w.ammoId;
 				LauncherId = w.itemId;
 				Launcher = w;
 				if (w.bulletSpeed > 1f) _speed = w.bulletSpeed;
 				try { FireClipName = w.fireClip; } catch { }
-				try { AmmoName = im.FindItemAttrById(AmmoId)?.ItemName_EN ?? AmmoName; } catch { }
+				try { RocketName = im.FindItemAttrById(RocketAmmoId)?.ItemName_EN ?? RocketName; } catch { }
 				string wn = "?";
 				try { wn = w.ItemName_EN; } catch { }
-				log.Append($"launcher {LauncherId} '{wn}', bullet prefab '{bp}', ammo {AmmoId} '{AmmoName}', speed {w.bulletSpeed}, range {w.fireRange}, clip '{FireClipName}'");
+				log.Append($"launcher {LauncherId} '{wn}', bullet prefab '{bp}', rocket ammo {RocketAmmoId} '{RocketName}', 105 mm shell id {Bundled.ShellId()}, speed {w.bulletSpeed}, range {w.fireRange}, clip '{FireClipName}'");
 			}
 		}
 		catch (Exception e) { log.Append("weapon scan failed: " + e.Message + "; "); }

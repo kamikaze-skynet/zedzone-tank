@@ -40,6 +40,7 @@ if (Test-Path $Content) { Remove-Item $Content -Recurse -Force }
 New-Item -ItemType Directory -Force $ModDir | Out-Null
 Copy-Item (Join-Path $Source "mod.json") (Join-Path $ModDir "mod.json") -Force
 Copy-Item $Dll (Join-Path $ModDir "Tank.dll") -Force
+Copy-Item (Join-Path $Source "items") (Join-Path $ModDir "items") -Recurse -Force
 Copy-Item (Join-Path $PSScriptRoot "README.md") (Join-Path $ModDir "README.md") -Force
 $modJson = Join-Path $ModDir "mod.json"
 $json = Get-Content $modJson -Raw

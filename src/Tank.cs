@@ -883,10 +883,10 @@ internal static partial class Tank
 	{
 		if (!_vis.TryGetValue(v.Pointer, out Vis x)) return;
 		var boxes = AmmoSources(pc, v);
-		int rockets = Rockets.Find() ? Count(boxes, Rockets.AmmoId) : 0;
-		string rocketTxt = !Rockets.Find() ? "no rockets found in this game" : (TankPlugin.RocketsNeedAmmo.Value ? rockets.ToString() : "unlimited");
+		int rockets = Rockets.Find() && Rockets.AmmoId > 0 ? Count(boxes, Rockets.AmmoId) : 0;
+		string rocketTxt = !Rockets.Find() ? "gun not ready" : Rockets.AmmoId <= 0 ? "105 mm shells not loaded" : (TankPlugin.RocketsNeedAmmo.Value ? rockets.ToString() : "unlimited");
 		float reload = Mathf.Max(0f, _cannonAt - now);
-		Status = $"Tank  |  LMB main gun (rockets: {rocketTxt}{(reload > 0f ? $", loading {reload:0.0}s" : "")})  |  RMB machine gun  |  fuel {Fuel(v):0.#} / {Cap(v.vehicleData):0} L";
+		Status = $"Tank  |  LMB main gun (105 mm: {rocketTxt}{(reload > 0f ? $", loading {reload:0.0}s" : "")})  |  RMB machine gun  |  fuel {Fuel(v):0.#} / {Cap(v.vehicleData):0} L";
 		if (!MouseFree()) return;
 		if (Input.GetMouseButton(0) && now >= _cannonAt) FireCannon(pc, v, x, boxes, now);
 		if (Input.GetMouseButton(1) && now >= _mgAt) FireMg(pc, v, x, boxes, now);
@@ -897,12 +897,18 @@ internal static partial class Tank
 		_cannonAt = now + Mathf.Max(0.2f, TankPlugin.ReloadSeconds.Value);
 		if (!Rockets.Find())
 		{
-			Msg("The main gun found no rockets in this game (see BepInEx\\Tank.log)");
+			Msg("The main gun isn't ready (see BepInEx\\Tank.log)");
+			return;
+		}
+		if (TankPlugin.RocketsNeedAmmo.Value && Rockets.AmmoId <= 0)
+		{
+			Msg("The 105 mm shell item didn't load (see BepInEx\\Tank.log)");
+			_cannonAt = now + 0.6f;
 			return;
 		}
 		if (TankPlugin.RocketsNeedAmmo.Value && AutoIO.Take(boxes, Rockets.AmmoId, 1f) < 1f)
 		{
-			Msg($"No rockets: put {Rockets.AmmoName} in the tank's cargo or your backpack");
+			Msg($"No shells: put {Rockets.AmmoName} in the tank's cargo or your backpack");
 			_cannonAt = now + 0.6f;
 			return;
 		}
@@ -922,7 +928,7 @@ internal static partial class Tank
 		}
 		else
 		{
-			Msg("The rocket failed to launch (see BepInEx\\Tank.log)");
+			Msg("The shell failed to fire (see BepInEx\\Tank.log)");
 		}
 	}
 

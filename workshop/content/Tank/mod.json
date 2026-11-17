@@ -1,7 +1,7 @@
 {
     "name": "Tank",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "author": "girthy_mods",
-    "description": "A drivable main battle tank. The turret follows your mouse: left click fires rockets from the main gun, right click fires the roof machine gun. Runs on gasoline like the game's cars. Press Page Up to call one in.",
+    "description": "A drivable main battle tank. The turret follows your mouse: left click fires 105 mm shells from the main gun, right click fires the roof machine gun. Runs on gasoline like the game's cars. Press Page Up to call one in.",
     "enabled": true
 }

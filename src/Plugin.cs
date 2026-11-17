@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.0.0";
+	public const string Version = "1.1.0";
 
 	internal static ManualLogSource L;
 
@@ -28,6 +28,7 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<float> TurretSpeed;
 	internal static ConfigEntry<float> ReloadSeconds;
 	internal static ConfigEntry<bool> RocketsNeedAmmo;
+	internal static ConfigEntry<bool> RocketsIfNoShells;
 	internal static ConfigEntry<float> RocketDamage;
 	internal static ConfigEntry<float> RocketSpeed;
 	internal static ConfigEntry<bool> MgNeedsAmmo;
@@ -53,7 +54,8 @@ public class TankPlugin : BasePlugin
 		CrewDamage = Config.Bind("Armor", "CrewDamageTaken", 0.1f, new ConfigDescription("Share of damage that reaches the crew inside (a car is much higher).", new AcceptableValueRange<float>(0f, 1f)));
 		TurretSpeed = Config.Bind("MainGun", "TurretTurnSpeed", 120f, "How fast the turret turns toward the mouse (degrees per second).");
 		ReloadSeconds = Config.Bind("MainGun", "ReloadSeconds", 2.5f, "Seconds between main gun shots.");
-		RocketsNeedAmmo = Config.Bind("MainGun", "UseAmmo", true, "Each shot uses one of the game's recoilless rockets from the tank's cargo or your backpack.");
+		RocketsNeedAmmo = Config.Bind("MainGun", "UseAmmo", true, "Each shot uses one 105 mm Tank Shell from the tank's cargo or your backpack.");
+		RocketsIfNoShells = Config.Bind("MainGun", "RocketsIfNoShells", false, "If the 105 mm shell item fails to load, use the game's recoilless rockets as ammo instead.");
 		RocketDamage = Config.Bind("MainGun", "DirectHitDamageMultiplier", 1f, "Multiplies the rocket's direct hit damage (its blast is the game's own).");
 		RocketSpeed = Config.Bind("MainGun", "RocketSpeed", 0f, "Rocket speed. 0 = the game's recoilless launcher speed.");
 		MgNeedsAmmo = Config.Bind("MachineGun", "UseAmmo", true, "Each round uses one 5.56mm or 7.62x39mm round from the cargo or your backpack.");
@@ -65,6 +67,13 @@ public class TankPlugin : BasePlugin
 		NoiseRadius = Config.Bind("Effects", "NoiseRadius", 30f, "Zombies within this range hear the guns.");
 		FxScale = Config.Bind("Effects", "EffectScale", 2f, "Size of tracers, muzzle flashes and smoke.");
 		Volume = Config.Bind("Effects", "Volume", 0.8f, new ConfigDescription("Gun volume.", new AcceptableValueRange<float>(0f, 1f)));
+		try
+		{
+			var lh = new Harmony(Guid + ".items");
+			var loadAll = AccessTools.Method(typeof(ModLoader), nameof(ModLoader.LoadAll));
+			if (loadAll != null) lh.Patch(loadAll, postfix: new HarmonyMethod(typeof(TankPlugin), nameof(LoadAllPost)));
+		}
+		catch (Exception e) { Log.LogWarning("ModLoader.LoadAll hook failed: " + e.Message); }
 		AddComponent<TankRunner>();
 		Log.LogInfo($"Tank {Version} loaded. Call key: {CallKey.Value}.");
 	}
@@ -96,6 +105,11 @@ public class TankPlugin : BasePlugin
 		TLog.Info($"Patches: {ok}/{types.Length} ok, save hooks {saves}.");
 	}
 
+	private static void LoadAllPost()
+	{
+		try { Bundled.LoadMissing("after game mods"); } catch (Exception e) { TLog.Warn("bundled items: " + e.Message); }
+	}
+
 	private static void OnSave()
 	{
 		try { Tank.OnGameSave(); } catch { }
@@ -113,6 +127,7 @@ public class TankRunner : MonoBehaviour
 	private void Update()
 	{
 		TankPlugin.EnsurePatched();
+		if (Time.frameCount % 120 == 0) { try { var im = ItemManager.instance; if (im != null && im.itemList != null && im.itemList.Count > 0) Bundled.LoadMissing("late"); } catch { } }
 		Active = TankPlugin.Enabled.Value;
 		if (!Active) return;
 		try { Tank.Tick(Time.deltaTime); }

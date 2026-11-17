@@ -12,10 +12,11 @@ public static class TankApi
 		return Tank.CallIn(gc.playerCharacter, ignoreLimit);
 	}
 
-	/// <summary>The item id of the main gun's rockets (the game's recoilless round), or -1.</summary>
+	/// <summary>The item id of the main gun's ammo (the 105 mm Tank Shell), or -1.</summary>
 	public static int RocketItemId()
 	{
-		return Rockets.Find() ? Rockets.AmmoId : -1;
+		Rockets.Find();
+		return Rockets.AmmoId;
 	}
 
 	/// <summary>Gives the local player full cans of gasoline (the tank's fuel, same as cars).</summary>
