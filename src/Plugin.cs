@@ -1,0 +1,165 @@
+using System;
+using System.Reflection;
+using BepInEx;
+using BepInEx.Configuration;
+using BepInEx.Logging;
+using BepInEx.Unity.IL2CPP;
+using HarmonyLib;
+using UnityEngine;
+
+namespace ZedTank;
+
+[BepInPlugin(Guid, "Tank", Version)]
+public class TankPlugin : BasePlugin
+{
+	public const string Guid = "girthy_mods.zedzone.tank";
+	public const string Version = "1.0.0";
+
+	internal static ManualLogSource L;
+
+	internal static ConfigEntry<bool> Enabled;
+	internal static ConfigEntry<KeyCode> CallKey;
+	internal static ConfigEntry<int> MaxTanks;
+	internal static ConfigEntry<float> NearbyRadius;
+	internal static ConfigEntry<float> StartFuel;
+	internal static ConfigEntry<float> TankScale;
+	internal static ConfigEntry<int> SortingOrder;
+	internal static ConfigEntry<float> CrewDamage;
+	internal static ConfigEntry<float> TurretSpeed;
+	internal static ConfigEntry<float> ReloadSeconds;
+	internal static ConfigEntry<bool> RocketsNeedAmmo;
+	internal static ConfigEntry<float> RocketDamage;
+	internal static ConfigEntry<float> RocketSpeed;
+	internal static ConfigEntry<bool> MgNeedsAmmo;
+	internal static ConfigEntry<float> MgDamage;
+	internal static ConfigEntry<float> MgRate;
+	internal static ConfigEntry<float> MgAimRadius;
+	internal static ConfigEntry<float> MgSpread;
+	internal static ConfigEntry<float> MgRange;
+	internal static ConfigEntry<float> NoiseRadius;
+	internal static ConfigEntry<float> FxScale;
+	internal static ConfigEntry<float> Volume;
+
+	public override void Load()
+	{
+		L = Log;
+		Enabled = Config.Bind("General", "Enabled", true, "Turn the tank mod on or off.");
+		CallKey = Config.Bind("General", "CallKey", KeyCode.PageUp, "Press to call a tank in front of you. Shift + this key next to a tank pours your gas cans into it.");
+		MaxTanks = Config.Bind("General", "MaxTanks", 1, new ConfigDescription("How many tanks each save can call in with the key. 0 = no limit. (Spawn Menu's Tank kit ignores this.)", new AcceptableValueRange<int>(0, 20)));
+		NearbyRadius = Config.Bind("General", "NearbyRadius", 30f, new ConfigDescription("You can't call another tank while one is parked this close (tiles).", new AcceptableValueRange<float>(0f, 500f)));
+		StartFuel = Config.Bind("General", "StartFuel", 0.5f, new ConfigDescription("How full a new tank's fuel tank is (0 to 1).", new AcceptableValueRange<float>(0f, 1f)));
+		TankScale = Config.Bind("Look", "Scale", 1.25f, new ConfigDescription("Size of the tank's art.", new AcceptableValueRange<float>(0.5f, 3f)));
+		SortingOrder = Config.Bind("Look", "SortingOrder", 32000, "Draw order of the tank's art (higher draws on top of more things).");
+		CrewDamage = Config.Bind("Armor", "CrewDamageTaken", 0.1f, new ConfigDescription("Share of damage that reaches the crew inside (a car is much higher).", new AcceptableValueRange<float>(0f, 1f)));
+		TurretSpeed = Config.Bind("MainGun", "TurretTurnSpeed", 120f, "How fast the turret turns toward the mouse (degrees per second).");
+		ReloadSeconds = Config.Bind("MainGun", "ReloadSeconds", 2.5f, "Seconds between main gun shots.");
+		RocketsNeedAmmo = Config.Bind("MainGun", "UseAmmo", true, "Each shot uses one of the game's recoilless rockets from the tank's cargo or your backpack.");
+		RocketDamage = Config.Bind("MainGun", "DirectHitDamageMultiplier", 1f, "Multiplies the rocket's direct hit damage (its blast is the game's own).");
+		RocketSpeed = Config.Bind("MainGun", "RocketSpeed", 0f, "Rocket speed. 0 = the game's recoilless launcher speed.");
+		MgNeedsAmmo = Config.Bind("MachineGun", "UseAmmo", true, "Each round uses one 5.56mm or 7.62x39mm round from the cargo or your backpack.");
+		MgDamage = Config.Bind("MachineGun", "Damage", 400f, "Damage per round (it locks on to the hostile nearest the mouse; a normal zombie has about 1100 HP).");
+		MgRate = Config.Bind("MachineGun", "RoundsPerSecond", 9f, "Machine gun fire rate.");
+		MgAimRadius = Config.Bind("MachineGun", "AimRadius", 1.6f, "Lock-on range around the mouse pointer (tiles).");
+		MgSpread = Config.Bind("MachineGun", "Spread", 0.6f, "Spread when nothing is locked on (tiles).");
+		MgRange = Config.Bind("MachineGun", "Range", 22f, "Machine gun range (tiles).");
+		NoiseRadius = Config.Bind("Effects", "NoiseRadius", 30f, "Zombies within this range hear the guns.");
+		FxScale = Config.Bind("Effects", "EffectScale", 2f, "Size of tracers, muzzle flashes and smoke.");
+		Volume = Config.Bind("Effects", "Volume", 0.8f, new ConfigDescription("Gun volume.", new AcceptableValueRange<float>(0f, 1f)));
+		AddComponent<TankRunner>();
+		Log.LogInfo($"Tank {Version} loaded. Call key: {CallKey.Value}.");
+	}
+
+	private static bool _patched;
+
+	internal static void EnsurePatched()
+	{
+		if (_patched) return;
+		_patched = true;
+		var h = new Harmony(Guid);
+		Type[] types = { typeof(P_MouseDown), typeof(P_MouseHold), typeof(P_Name1), typeof(P_Name2), typeof(P_Name3) };
+		int ok = 0;
+		foreach (Type t in types)
+		{
+			try { h.PatchAll(t); ok++; }
+			catch (Exception e) { TLog.Warn("patch " + t.Name + " failed: " + e.Message); }
+		}
+		int saves = 0;
+		foreach (string name in new[] { "SaveGameData", "SaveGameDataAsync" })
+		{
+			foreach (MethodInfo m in AccessTools.GetDeclaredMethods(typeof(GameDataManager)))
+			{
+				if (m.Name != name) continue;
+				try { h.Patch(m, new HarmonyMethod(typeof(TankPlugin), nameof(OnSave))); saves++; }
+				catch (Exception e) { TLog.Warn("save hook " + name + " failed: " + e.Message); }
+			}
+		}
+		TLog.Info($"Patches: {ok}/{types.Length} ok, save hooks {saves}.");
+	}
+
+	private static void OnSave()
+	{
+		try { Tank.OnGameSave(); } catch { }
+	}
+}
+
+public class TankRunner : MonoBehaviour
+{
+	internal static bool Active;
+	private GUIStyle _style;
+	private Texture2D _white;
+
+	public TankRunner(IntPtr ptr) : base(ptr) { }
+
+	private void Update()
+	{
+		TankPlugin.EnsurePatched();
+		Active = TankPlugin.Enabled.Value;
+		if (!Active) return;
+		try { Tank.Tick(Time.deltaTime); }
+		catch (Exception e) { TLog.Warn("tick: " + e.Message); }
+	}
+
+	private void OnGUI()
+	{
+		try
+		{
+			if (!Active || Event.current == null || Event.current.type != EventType.Repaint) return;
+			string a = Tank.Message();
+			string b = Tank.Status;
+			if (!string.IsNullOrEmpty(b)) Hint(b, 0);
+			if (!string.IsNullOrEmpty(a)) Hint(a, 1);
+		}
+		catch { }
+	}
+
+	private void Hint(string text, int row)
+	{
+		if (_style == null)
+		{
+			_style = new GUIStyle(GUI.skin.label);
+			_style.alignment = TextAnchor.MiddleCenter;
+			_style.fontSize = 15;
+			_style.normal.textColor = Color.white;
+			_white = new Texture2D(1, 1);
+			_white.SetPixel(0, 0, Color.white);
+			_white.Apply();
+			_white.hideFlags = HideFlags.HideAndDontSave;
+		}
+		float s = Mathf.Clamp(Screen.height / 1080f, 0.75f, 2f);
+		Matrix4x4 old = GUI.matrix;
+		GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
+		float sw = Screen.width / s, sh = Screen.height / s;
+		float w = Mathf.Min(Mathf.Max(460f, _style.CalcSize(new GUIContent(text)).x + 40f), sw - 40f);
+		float h = 34f;
+		float x = (sw - w) / 2f;
+		float y = sh * 0.72f - 42f - row * (h + 6f);
+		Color c = GUI.color;
+		GUI.color = new Color(0.07f, 0.07f, 0.08f, 0.85f);
+		GUI.DrawTexture(new Rect(x, y, w, h), _white);
+		GUI.color = new Color(0.45f, 0.55f, 0.25f, 1f);
+		GUI.DrawTexture(new Rect(x, y, 3f, h), _white);
+		GUI.color = c;
+		GUI.Label(new Rect(x, y, w, h), text, _style);
+		GUI.matrix = old;
+	}
+}

@@ -1,0 +1,948 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using BepInEx;
+using Il2CppInterop.Runtime.InteropTypes;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
+using UnityEngine;
+using UnityEngine.Rendering.Universal;
+
+namespace ZedTank;
+
+// The tank is one of the game's own cars (so it drives, takes damage, carries cargo and
+// burns gasoline exactly like the game's cars) with its look replaced by a hull, a turret
+// that turns toward the mouse and a roof machine gun. The approach (tagging a base car with
+// a name id, hiding its renderers, remembering where tagged cars are) follows Vanish's
+// Industrial Age helicopter, used with permission.
+internal static partial class Tank
+{
+	public const int NameId = 88040;
+
+	// Sprite layout, in pixels of the art (32 px = 1 tile at scale 1).
+	private const float Ppu = 32f;
+	private static readonly Vector2 TurretOnHull = new Vector2(8f, 0f) / Ppu;      // turret ring centre vs hull centre
+	private static readonly Vector2 MgOnTurret = new Vector2(-14f, -14f) / Ppu;    // loader hatch vs turret ring
+	private const float BarrelLen = 156f / Ppu;                                    // turret ring to muzzle
+	private const float MgLen = 42f / Ppu;
+
+	private class Vis
+	{
+		public GameObject Root;
+		public SpriteRenderer Hull;
+		public Transform TurretPivot;
+		public SpriteRenderer Turret;
+		public SpriteRenderer TurretShadow;
+		public Transform MgPivot;
+		public SpriteRenderer Mg;
+		public float TurretRel;   // turret angle relative to the hull (degrees)
+		public float MgRel;       // machine gun angle relative to the turret
+		public readonly List<Renderer> Hidden = new List<Renderer>();
+		public float NextHide;
+	}
+
+	private static readonly CultureInfo CI = CultureInfo.InvariantCulture;
+	private static readonly Dictionary<IntPtr, Vis> _vis = new Dictionary<IntPtr, Vis>();
+	private static readonly List<Vector2> _known = new List<Vector2>();
+	private static readonly Dictionary<IntPtr, int> _knownIdx = new Dictionary<IntPtr, int>();
+
+	private static long _saveId = -1;
+	private static IntPtr _gdPtr;
+	private static int _called;
+	private static bool _dirty;
+	private static float _nextSave;
+	private static float _scanAt;
+	private static float _callWait;
+	private static float _cannonAt;
+	private static float _mgAt;
+	private static float _fwd;
+	private static bool _fwdKnown;
+	private static int _baseId = -1;
+	private static int _sortLayer;
+	private static bool _sortSet;
+	private static Sprite _hullSp, _turretSp, _mgSp;
+	private static bool _spriteTried;
+	private static string _msg;
+	private static float _msgUntil;
+	private static int _hitLog, _retagLog, _spawnLog;
+	private static BasicVehicle _mine;
+
+	internal static string Status;
+
+	/// <summary>True while the local player is driving a tank (mouse aims the turret).</summary>
+	public static bool Crewing => _mine != null;
+
+	private static string FilePath => Path.Combine(Paths.ConfigPath, $"Tank.{_saveId}.txt");
+
+	// ------------------------------------------------------------------ messages
+
+	private static void Msg(string s)
+	{
+		_msg = s;
+		_msgUntil = Time.realtimeSinceStartup + 4f;
+	}
+
+	public static string Message() => Time.realtimeSinceStartup < _msgUntil ? _msg : null;
+
+	internal static string Ok(string m) { Msg(m); return m; }
+
+	internal static string Fail(string m) { Msg(m); return "!" + m; }
+
+	// ------------------------------------------------------------------ identity
+
+	public static bool IsTank(BasicVehicle v)
+	{
+		try
+		{
+			if (v == null) return false;
+			if (v.vehicleNameTextId == NameId) return true;
+			VehicleData d = v.vehicleData;
+			return d != null && d.vehicleNameTextId == NameId;
+		}
+		catch { return false; }
+	}
+
+	private static void Tag(BasicVehicle v)
+	{
+		try { v.vehicleNameTextId = NameId; } catch { }
+		try { if (v.vehicleData != null) v.vehicleData.vehicleNameTextId = NameId; } catch { }
+		Toughen(v);
+	}
+
+	// Crew inside take much less damage than in a car.
+	private static void Toughen(BasicVehicle v)
+	{
+		try { v.inVehicleCharacterDamageTakenFloat = Mathf.Clamp01(TankPlugin.CrewDamage.Value); } catch { }
+	}
+
+	// The base car: the game's fuel-powered car with the most seats (then the biggest cargo hold).
+	private static int BaseId()
+	{
+		if (_baseId >= 0) return _baseId;
+		GameController gc = GameController.instance;
+		var sb = new StringBuilder();
+		int best = -1;
+		float bestScore = -1f;
+		int n = 64;
+		try { if (gc.vehiclePrefabs != null) n = Mathf.Max(gc.vehiclePrefabs.Length, 1); } catch { }
+		for (int i = 0; i < n + 4; i++)
+		{
+			try
+			{
+				if (!gc.IsValidVehicleId(i)) continue;
+				BasicVehicle p = gc.GetVehiclePrefabConfig(i);
+				if (p == null) continue;
+				string name = null;
+				try { name = TextManager.instance?.GetText(p.vehicleNameTextId); } catch { }
+				Vector2Int inv = p.inventorySize;
+				float score = p.passengerSeatLimit * 100f + inv.x * inv.y;
+				bool fuel = (int)p.powerType == 0;
+				if (sb.Length < 900) sb.Append($"{i} '{name}' seats {p.passengerSeatLimit} cargo {inv.x}x{inv.y} {p.powerType}; ");
+				if (fuel && i != GameController.forkliftVehicleId && score > bestScore)
+				{
+					bestScore = score;
+					best = i;
+				}
+			}
+			catch { }
+		}
+		TLog.Info($"Cars: {sb}-> tank base car {best}");
+		_baseId = best;
+		return best;
+	}
+
+	// ------------------------------------------------------------------ save file
+
+	private static float F(string s) => float.Parse(s, NumberStyles.Float, CI);
+
+	private static void Load()
+	{
+		_called = 0;
+		_known.Clear();
+		_knownIdx.Clear();
+		ClearVis();
+		_mine = null;
+		try
+		{
+			if (!File.Exists(FilePath)) return;
+			foreach (string line in File.ReadAllLines(FilePath))
+			{
+				string[] a = line.Split('|');
+				if (a[0] == "K" && a.Length >= 3) _known.Add(new Vector2(F(a[1]), F(a[2])));
+				else if (a[0] == "C" && a.Length >= 2) _called = int.Parse(a[1], CI);
+				else if (a[0] == "R" && a.Length >= 2) { _fwd = F(a[1]); _fwdKnown = true; }
+			}
+			TLog.Info($"Save {_saveId}: {_known.Count} tank(s) on record, {_called} called in");
+		}
+		catch (Exception e) { TLog.Warn("load: " + e.Message); }
+	}
+
+	private static void Save()
+	{
+		try
+		{
+			var sb = new StringBuilder();
+			sb.AppendLine("C|" + _called.ToString(CI));
+			if (_fwdKnown) sb.AppendLine("R|" + _fwd.ToString("0", CI));
+			foreach (Vector2 k in _known) sb.AppendLine($"K|{k.x.ToString("0.##", CI)}|{k.y.ToString("0.##", CI)}");
+			File.WriteAllText(FilePath, sb.ToString(), new UTF8Encoding(false));
+			_dirty = false;
+		}
+		catch (Exception e) { TLog.Warn("save: " + e.Message); }
+	}
+
+	public static void OnGameSave()
+	{
+		try
+		{
+			if (_saveId < 0) return;
+			Track();
+			Save();
+		}
+		catch { }
+	}
+
+	// Remembers where every tank is, and after a reload re-tags the base car parked there.
+	private static void Track()
+	{
+		var live = BasicVehicle.s_liveVehicles;
+		if (live == null) return;
+		var alive = new HashSet<IntPtr>();
+		for (int i = 0; i < live.Count; i++) if (live[i] != null) alive.Add(live[i].Pointer);
+		var gone = new List<IntPtr>();
+		foreach (IntPtr k in _knownIdx.Keys) if (!alive.Contains(k)) gone.Add(k);
+		foreach (IntPtr k in gone) _knownIdx.Remove(k);
+		var used = new HashSet<int>(_knownIdx.Values);
+		for (int i = 0; i < live.Count; i++)
+		{
+			BasicVehicle v = live[i];
+			if (v == null || !IsTank(v)) continue;
+			Vector2 p = VehPos(v);
+			if (!_knownIdx.TryGetValue(v.Pointer, out int idx))
+			{
+				idx = Nearest(p, 3f, used);
+				if (idx < 0)
+				{
+					_known.Add(p);
+					idx = _known.Count - 1;
+					_dirty = true;
+				}
+				_knownIdx[v.Pointer] = idx;
+				used.Add(idx);
+				Toughen(v);
+			}
+			if ((_known[idx] - p).sqrMagnitude > 0.25f)
+			{
+				_known[idx] = p;
+				_dirty = true;
+			}
+		}
+		int baseId = BaseId();
+		for (int i = 0; i < live.Count; i++)
+		{
+			BasicVehicle v = live[i];
+			if (v == null || IsTank(v) || _knownIdx.ContainsKey(v.Pointer)) continue;
+			VehicleData d = null;
+			try { d = v.vehicleData; } catch { }
+			if (d == null || d.vehicleId != baseId) continue;
+			try { if (d.vehicleNameTextId == 88030) continue; } catch { } // the Helicopter mod's
+			Vector2 p = VehPos(v);
+			int idx = Nearest(p, 2.5f, used);
+			if (idx < 0) continue;
+			Tag(v);
+			_knownIdx[v.Pointer] = idx;
+			used.Add(idx);
+			if (_retagLog++ < 8) TLog.Info($"Re-tagged the tank at {p.x:0.#},{p.y:0.#} after loading");
+		}
+	}
+
+	private static int Nearest(Vector2 p, float r, HashSet<int> skip)
+	{
+		int best = -1;
+		float bd = r * r;
+		for (int i = 0; i < _known.Count; i++)
+		{
+			if (skip.Contains(i)) continue;
+			float d = (_known[i] - p).sqrMagnitude;
+			if (d < bd) { bd = d; best = i; }
+		}
+		return best;
+	}
+
+	// ------------------------------------------------------------------ spawning
+
+	private static BasicChunk ChunkAt(Vector2 pos)
+	{
+		try
+		{
+			MapController m = MapController.instance;
+			return m.GetChunkByCoordinate(m.GetChunkCoordinateByPosition(pos));
+		}
+		catch { return null; }
+	}
+
+	private static bool TankNear(Vector2 pos, float r)
+	{
+		try
+		{
+			var live = BasicVehicle.s_liveVehicles;
+			if (live == null) return false;
+			for (int i = 0; i < live.Count; i++)
+			{
+				if (IsTank(live[i]) && ((Vector2)live[i].transform.position - pos).sqrMagnitude < r * r) return true;
+			}
+		}
+		catch { }
+		return false;
+	}
+
+	private static BasicVehicle Spawn(Vector2 pos, float heading)
+	{
+		GameController gc = GameController.instance;
+		int baseId = BaseId();
+		if (baseId < 0) { TLog.Warn("no base car found"); return null; }
+		BasicChunk chunk = ChunkAt(pos);
+		ChunkData cd = chunk != null ? chunk.chunkData : null;
+		if (cd == null) { TLog.Warn($"spawn: chunk at {pos} not loaded"); return null; }
+		VehicleData vd;
+		try { vd = gc.GetPristineVehicleData(baseId, heading); }
+		catch (Exception e) { TLog.Warn("GetPristineVehicleData: " + e.Message); return null; }
+		if (vd == null) return null;
+		vd.vehicleNameTextId = NameId;
+		try { vd.worldCoordinate = pos; } catch { }
+		try { vd.coordinateX = pos.x; vd.coordinateY = pos.y; } catch { }
+		try { vd.eularAngleZ = heading; } catch { }
+		try { vd.zLevel = gc.playerCharacter.characterData.zLevel; } catch { }
+		SetFuel(vd, Cap(vd) * Mathf.Clamp01(TankPlugin.StartFuel.Value));
+		try { if (cd.vehicleDataList != null && !cd.vehicleDataList.Contains(vd)) cd.vehicleDataList.Add(vd); } catch { }
+		BasicVehicle v = null;
+		string how = "";
+		try
+		{
+			InGameController igc = InGameController.instance;
+			if (igc != null) { v = igc.AddVehicle(vd, chunk); how = "AddVehicle"; }
+		}
+		catch (Exception e) { how = "AddVehicle failed " + e.Message + "; "; }
+		if (v == null)
+		{
+			try { v = cd.SpawnVehicleOnLayer(vd); how += "SpawnVehicleOnLayer"; }
+			catch (Exception e) { how += "SpawnVehicleOnLayer failed " + e.Message; }
+		}
+		if (v == null)
+		{
+			try { cd.vehicleDataList.Remove(vd); } catch { }
+		}
+		else
+		{
+			Tag(v);
+			try
+			{
+				v.transform.position = new Vector3(pos.x, pos.y, v.transform.position.z);
+				if (v.m_rigidbody != null) v.m_rigidbody.position = pos;
+			}
+			catch { }
+			try { var l = chunk.vehicleList; if (l != null && !l.Contains(v)) l.Add(v); } catch { }
+			try { if (!v.initExecutedFlag) v.Init(); } catch { }
+			try
+			{
+				VehiclePartData t = v.fuelTankData ?? FuelPart(v.vehicleData);
+				if (t != null) t.fuel = Cap(v.vehicleData) * Mathf.Clamp01(TankPlugin.StartFuel.Value);
+			}
+			catch { }
+			_known.Add(pos);
+			_knownIdx[v.Pointer] = _known.Count - 1;
+			_dirty = true;
+		}
+		if (_spawnLog++ < 8) TLog.Info($"Spawn tank (base car {baseId}, {how}) at {pos.x:0.#},{pos.y:0.#}: {(v != null ? $"ok, fuel {Fuel(v):0.#}/{Cap(v.vehicleData):0} L" : "FAILED")}");
+		return v;
+	}
+
+	internal static string CallIn(HumanCharacterController pc, bool ignoreLimit)
+	{
+		if (pc == null) return Fail("Load into a world first");
+		try { if (pc.drivingVehicle != null) return Fail("Get out of the vehicle first"); } catch { }
+		if (!Sprites()) return Fail("Tank art failed to load (see BepInEx\\Tank.log)");
+		Vector2 here = pc.transform.position;
+		if (!ignoreLimit && TankNear(here, TankPlugin.NearbyRadius.Value)) return Fail("There's already a tank close by");
+		int max = TankPlugin.MaxTanks.Value;
+		if (!ignoreLimit && max > 0 && _called >= max) return Fail($"This save has already called in {max} tank(s) (setting MaxTanks)");
+		Vector2 spot = here + new Vector2(0f, -5f);
+		if (Spawn(spot, 0f) != null)
+		{
+			_called++;
+			Save();
+			return Ok("Tank delivered. Get in, start the engine and roll out.");
+		}
+		return Fail("No room for a tank here, try an open spot");
+	}
+
+	private static void CallKey(HumanCharacterController pc)
+	{
+		KeyCode key = TankPlugin.CallKey.Value;
+		if (key == KeyCode.None || !Input.GetKeyDown(key)) return;
+		if (Time.realtimeSinceStartup < _callWait) return;
+		_callWait = Time.realtimeSinceStartup + 1.5f;
+		if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+		{
+			Refuel(pc);
+			return;
+		}
+		CallIn(pc, false);
+	}
+
+	// ------------------------------------------------------------------ fuel (the game's car fuel)
+
+	private static VehiclePartData FuelPart(VehicleData vd)
+	{
+		try
+		{
+			var parts = vd?.vehiclePartDatas;
+			if (parts == null) return null;
+			for (int i = 0; i < parts.Count; i++) if (parts[i] != null && (int)parts[i].vehiclePartType == 4) return parts[i];
+		}
+		catch { }
+		return null;
+	}
+
+	private static void SetFuel(VehicleData vd, float l)
+	{
+		VehiclePartData t = FuelPart(vd);
+		if (t != null) t.fuel = Mathf.Clamp(l, 0f, Cap(vd));
+	}
+
+	internal static float Cap(VehicleData vd)
+	{
+		try { if (vd.vehicleFuelTankSize > 1f) return vd.vehicleFuelTankSize; } catch { }
+		return 60f;
+	}
+
+	internal static float Fuel(BasicVehicle v)
+	{
+		try
+		{
+			VehiclePartData t = v.fuelTankData ?? FuelPart(v.vehicleData);
+			return t != null ? t.fuel : 0f;
+		}
+		catch { return 0f; }
+	}
+
+	internal static string Refuel(HumanCharacterController pc)
+	{
+		BasicVehicle v = null;
+		try { v = pc.drivingVehicle; } catch { }
+		if (!IsTank(v)) v = NearestTank(pc.transform.position, 6f);
+		if (v == null) return Fail("No tank close by to refuel");
+		float cap = Cap(v.vehicleData), before = Fuel(v);
+		if (cap - before < 0.05f) return Fail("The tank is already full");
+		VehiclePartData tank = null;
+		try { tank = v.fuelTankData ?? FuelPart(v.vehicleData); } catch { }
+		if (tank == null) return Fail("This tank has no fuel tank part");
+		foreach (InventoryData inv in Carried(pc))
+		{
+			var items = inv.itemList;
+			if (items == null) continue;
+			for (int i = 0; i < items.Count && Fuel(v) < cap - 0.05f; i++)
+			{
+				ItemData it = items[i];
+				if (it == null) continue;
+				try
+				{
+					if (!VehicleFuelTransfer.IsFuelContainer(it)) continue;
+					if (VehicleFuelTransfer.AddFuelFromContainer(v.vehicleData, tank, it) > 0f)
+					{
+						try { inv.RefreshTotalItemWeight(); } catch { }
+					}
+				}
+				catch (Exception e) { TLog.Warn("refuel: " + e.Message); }
+			}
+		}
+		float after = Fuel(v);
+		if (after - before < 0.01f) return Fail("You aren't carrying any gasoline");
+		return Ok($"Added {after - before:0.#} L of gasoline ({after:0.#} / {cap:0} L)");
+	}
+
+	private static BasicVehicle NearestTank(Vector2 pos, float r)
+	{
+		BasicVehicle best = null;
+		float bd = r * r;
+		try
+		{
+			var live = BasicVehicle.s_liveVehicles;
+			if (live == null) return null;
+			for (int i = 0; i < live.Count; i++)
+			{
+				BasicVehicle v = live[i];
+				if (!IsTank(v)) continue;
+				float d = ((Vector2)v.transform.position - pos).sqrMagnitude;
+				if (d <= bd) { bd = d; best = v; }
+			}
+		}
+		catch { }
+		return best;
+	}
+
+	internal static List<InventoryData> Carried(HumanCharacterController pc)
+	{
+		var list = new List<InventoryData>();
+		try
+		{
+			var l = pc.characterData.GetCarriedInventoryList();
+			if (l != null) for (int i = 0; i < l.Count; i++) if (l[i] != null) list.Add(l[i]);
+		}
+		catch { }
+		return list;
+	}
+
+	// Cargo hold first, then what you carry.
+	private static List<InventoryData> AmmoSources(HumanCharacterController pc, BasicVehicle v)
+	{
+		var list = new List<InventoryData>();
+		try { if (v.vehicleData?.inventoryData != null) list.Add(v.vehicleData.inventoryData); } catch { }
+		list.AddRange(Carried(pc));
+		return list;
+	}
+
+	private static int Count(List<InventoryData> boxes, int id)
+	{
+		float n = 0f;
+		foreach (InventoryData b in boxes)
+		{
+			try
+			{
+				var l = b.itemList;
+				for (int i = 0; i < l.Count; i++) if (l[i] != null && l[i].itemId == id) n += Mathf.Max(1f, l[i].itemNumberFloat);
+			}
+			catch { }
+		}
+		return Mathf.FloorToInt(n + 0.001f);
+	}
+
+	// ------------------------------------------------------------------ geometry
+
+	private static float VehAng(BasicVehicle v)
+	{
+		try { if (v.m_rigidbody != null) return v.m_rigidbody.rotation; } catch { }
+		return v.transform.eulerAngles.z;
+	}
+
+	private static Vector2 VehPos(BasicVehicle v)
+	{
+		try { if (v.m_rigidbody != null) return v.m_rigidbody.position; } catch { }
+		return v.transform.position;
+	}
+
+	private static float Heading(BasicVehicle v) => VehAng(v) + _fwd;
+
+	// Which way the base car's nose points in its own space, from its headlights.
+	private static void FindForward(BasicVehicle v)
+	{
+		if (_fwdKnown) return;
+		try
+		{
+			Light2D l = v.headlight_Left ?? v.headlight_Right;
+			if (l != null)
+			{
+				Vector3 local = v.transform.InverseTransformPoint(l.transform.position);
+				Vector2 lp = new Vector2(local.x, local.y);
+				if (lp.sqrMagnitude < 0.0001f)
+				{
+					Vector3 up = l.transform.up;
+					float a = Mathf.Atan2(up.y, up.x) * Mathf.Rad2Deg;
+					_fwd = Mathf.Round(Mathf.DeltaAngle(VehAng(v), a) / 90f) * 90f;
+				}
+				else
+				{
+					_fwd = Mathf.Round(Mathf.Atan2(lp.y, lp.x) * Mathf.Rad2Deg / 90f) * 90f;
+				}
+			}
+			else
+			{
+				Vector2 o = v.headLightLocalOffset;
+				if (o.sqrMagnitude < 0.01f) return;
+				_fwd = Mathf.Round(Mathf.Atan2(o.y, o.x) * Mathf.Rad2Deg / 90f) * 90f;
+			}
+			if (_fwd <= -180f) _fwd += 360f;
+			_fwdKnown = true;
+			_dirty = true;
+			TLog.Info($"Base car nose points {_fwd:0} degrees in its own space");
+		}
+		catch (Exception e) { TLog.Warn("forward: " + e.Message); }
+	}
+
+	private static Vector2 Dir(float deg) => new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad));
+
+	private static Vector2 Mouse()
+	{
+		Camera c = Camera.main;
+		if (c == null) return Vector2.zero;
+		Vector3 w = c.ScreenToWorldPoint(Input.mousePosition);
+		return new Vector2(w.x, w.y);
+	}
+
+	private static bool MouseFree()
+	{
+		try { if (MouseController.IsMouseOverUI()) return false; } catch { }
+		return Application.isFocused;
+	}
+
+	// ------------------------------------------------------------------ art
+
+	private static Sprite LoadSprite(string name, Vector2 pivot)
+	{
+		using Stream s = typeof(Tank).Assembly.GetManifestResourceStream("art." + name + ".png");
+		if (s == null) return null;
+		byte[] b = new byte[s.Length];
+		int r;
+		for (int i = 0; i < b.Length; i += r)
+		{
+			r = s.Read(b, i, b.Length - i);
+			if (r <= 0) break;
+		}
+		var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+		tex.hideFlags = HideFlags.HideAndDontSave;
+		ImageConversion.LoadImage(tex, (Il2CppStructArray<byte>)b);
+		tex.filterMode = FilterMode.Point;
+		Sprite sp = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), pivot, Ppu);
+		sp.hideFlags = HideFlags.HideAndDontSave;
+		return sp;
+	}
+
+	private static bool Sprites()
+	{
+		if (!_spriteTried)
+		{
+			_spriteTried = true;
+			try
+			{
+				_hullSp = LoadSprite("tank_hull", new Vector2(0.5f, 0.5f));
+				_turretSp = LoadSprite("tank_turret", new Vector2(64f / 224f, 0.5f));
+				_mgSp = LoadSprite("tank_mg", new Vector2(12f / 56f, 0.5f));
+				TLog.Info($"Art loaded: hull {_hullSp != null}, turret {_turretSp != null}, mg {_mgSp != null}");
+			}
+			catch (Exception e) { TLog.Warn("art: " + e.Message); }
+		}
+		return _hullSp != null && _turretSp != null && _mgSp != null;
+	}
+
+	private static SpriteRenderer NewSr(string name, Sprite sp, Transform parent, int order)
+	{
+		var go = new GameObject(name);
+		if (parent != null) go.transform.SetParent(parent, false);
+		SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
+		sr.sprite = sp;
+		sr.sortingLayerID = _sortLayer;
+		sr.sortingOrder = order;
+		return sr;
+	}
+
+	private static Vis EnsureVis(BasicVehicle v)
+	{
+		if (_vis.TryGetValue(v.Pointer, out Vis x) && x.Root != null) return x;
+		int o = TankPlugin.SortingOrder.Value;
+		x = new Vis();
+		x.Root = new GameObject("zt_tank");
+		var hs = NewSr("hull_shadow", _hullSp, x.Root.transform, o - 1);
+		hs.color = new Color(0.03f, 0.04f, 0.02f, 0.4f);
+		hs.transform.localPosition = new Vector3(0.12f, -0.12f, 0f);
+		x.Hull = NewSr("hull", _hullSp, x.Root.transform, o);
+		var tp = new GameObject("turret_pivot");
+		tp.transform.SetParent(x.Root.transform, false);
+		tp.transform.localPosition = TurretOnHull;
+		x.TurretPivot = tp.transform;
+		x.TurretShadow = NewSr("turret_shadow", _turretSp, x.TurretPivot, o + 1);
+		x.TurretShadow.color = new Color(0f, 0f, 0f, 0.35f);
+		x.TurretShadow.transform.localPosition = new Vector3(0.07f, -0.07f, 0f);
+		x.Turret = NewSr("turret", _turretSp, x.TurretPivot, o + 2);
+		var mp = new GameObject("mg_pivot");
+		mp.transform.SetParent(x.TurretPivot, false);
+		mp.transform.localPosition = MgOnTurret;
+		x.MgPivot = mp.transform;
+		x.Mg = NewSr("mg", _mgSp, x.MgPivot, o + 3);
+		float s = TankPlugin.TankScale.Value;
+		x.Root.transform.localScale = new Vector3(s, s, 1f);
+		_vis[v.Pointer] = x;
+		return x;
+	}
+
+	private static void ClearVis()
+	{
+		foreach (Vis x in _vis.Values)
+		{
+			try { if (x.Root != null) Object.Destroy(x.Root); } catch { }
+		}
+		_vis.Clear();
+	}
+
+	private static void HideCar(BasicVehicle v, Vis x, float now)
+	{
+		try { if (v.vehicleQuadRenderer != null && v.vehicleQuadRenderer.enabled) v.vehicleQuadRenderer.enabled = false; } catch { }
+		try { if (v.vehicleMeshRenderer != null && v.vehicleMeshRenderer.enabled) v.vehicleMeshRenderer.enabled = false; } catch { }
+		if (now < x.NextHide)
+		{
+			foreach (Renderer r in x.Hidden) if (r != null && r.enabled) r.enabled = false;
+			return;
+		}
+		x.NextHide = now + 0.5f;
+		x.Hidden.Clear();
+		try
+		{
+			foreach (Renderer r in v.GetComponentsInChildren<Renderer>(true))
+			{
+				if (r == null || r.GetComponentInParent<BasicCharacterController>() != null) continue;
+				// keep the headlight glow and tire marks out of it: only sprite/mesh bodies are hidden
+				if (r.enabled) r.enabled = false;
+				x.Hidden.Add(r);
+			}
+		}
+		catch { }
+	}
+
+	// ------------------------------------------------------------------ per frame
+
+	public static void Tick(float dt)
+	{
+		GameController gc = GameController.instance;
+		if (gc == null) return;
+		long sid;
+		IntPtr gd = IntPtr.Zero;
+		try
+		{
+			if (gc._gameData == null) return;
+			sid = gc._gameData.createdDateTime;
+			gd = gc._gameData.Pointer;
+		}
+		catch { return; }
+		HumanCharacterController pc = gc.playerCharacter;
+		if (pc == null) return;
+		if (sid != _saveId || gd != _gdPtr)
+		{
+			_saveId = sid;
+			_gdPtr = gd;
+			Load();
+		}
+		if (!_sortSet)
+		{
+			try
+			{
+				SpriteRenderer sr = pc.GetComponentInChildren<SpriteRenderer>();
+				if (sr != null) { _sortLayer = sr.sortingLayerID; _sortSet = true; }
+			}
+			catch { }
+		}
+		if (!Sprites()) return;
+		float now = Time.realtimeSinceStartup;
+		if (now >= _scanAt)
+		{
+			_scanAt = now + 0.5f;
+			try { Track(); } catch (Exception e) { TLog.Warn("track: " + e.Message); _scanAt = now + 5f; }
+		}
+		CallKey(pc);
+
+		BasicVehicle drv = null;
+		try { drv = pc.drivingVehicle; } catch { }
+		bool driving = drv != null && IsTank(drv) && SameDriver(drv, pc);
+		_mine = driving ? drv : null;
+		Status = null;
+		if (!driving && drv == null) NearHint(pc);
+
+		Draw(pc, dt, now);
+		if (driving)
+		{
+			try { Gunner(pc, drv, now); } catch (Exception e) { TLog.Warn("gunner: " + e); }
+		}
+		TankFx.Tick();
+		if (_dirty && now > _nextSave)
+		{
+			_nextSave = now + 5f;
+			Save();
+		}
+	}
+
+	private static bool SameDriver(BasicVehicle v, HumanCharacterController pc)
+	{
+		try { return v.driverCharacterController != null && v.driverCharacterController.Pointer == pc.Pointer; }
+		catch { return false; }
+	}
+
+	private static void NearHint(HumanCharacterController pc)
+	{
+		BasicVehicle v = NearestTank(pc.transform.position, 5f);
+		if (v == null) return;
+		Status = $"Tank: fuel {Fuel(v):0.#} / {Cap(v.vehicleData):0} L  |  Shift+{TankPlugin.CallKey.Value} refuels from your gas cans";
+	}
+
+	private static void Draw(HumanCharacterController pc, float dt, float now)
+	{
+		var seen = new HashSet<IntPtr>();
+		var live = BasicVehicle.s_liveVehicles;
+		Vector2 mouse = Mouse();
+		if (live != null)
+		{
+			for (int i = 0; i < live.Count; i++)
+			{
+				BasicVehicle v = live[i];
+				if (!IsTank(v)) continue;
+				seen.Add(v.Pointer);
+				FindForward(v);
+				Vis x = EnsureVis(v);
+				HideCar(v, x, now);
+				bool hidden = false;
+				try { hidden = v.layerHiddenFlag || !v.gameObject.activeInHierarchy; } catch { }
+				if (x.Root.activeSelf == hidden) x.Root.SetActive(!hidden);
+				Vector2 p = VehPos(v);
+				float h = Heading(v);
+				x.Root.transform.position = new Vector3(p.x, p.y, v.transform.position.z - 0.5f);
+				x.Root.transform.rotation = Quaternion.Euler(0f, 0f, h);
+				if (_mine != null && v.Pointer == _mine.Pointer)
+				{
+					// turret turns toward the mouse at its traverse speed; the roof gun snaps faster
+					Vector2 piv = x.TurretPivot.position;
+					float want = Mathf.Atan2(mouse.y - piv.y, mouse.x - piv.x) * Mathf.Rad2Deg;
+					float cur = h + x.TurretRel;
+					float next = Mathf.MoveTowardsAngle(cur, want, TankPlugin.TurretSpeed.Value * dt);
+					x.TurretRel = Mathf.DeltaAngle(0f, next - h);
+					Vector2 mp = x.MgPivot.position;
+					float mwant = Mathf.Atan2(mouse.y - mp.y, mouse.x - mp.x) * Mathf.Rad2Deg;
+					float mcur = h + x.TurretRel + x.MgRel;
+					float mnext = Mathf.MoveTowardsAngle(mcur, mwant, 360f * dt);
+					x.MgRel = Mathf.DeltaAngle(0f, mnext - h - x.TurretRel);
+				}
+				x.TurretPivot.localRotation = Quaternion.Euler(0f, 0f, x.TurretRel);
+				x.MgPivot.localRotation = Quaternion.Euler(0f, 0f, x.MgRel);
+			}
+		}
+		var drop = new List<IntPtr>();
+		foreach (IntPtr k in _vis.Keys) if (!seen.Contains(k)) drop.Add(k);
+		foreach (IntPtr k in drop)
+		{
+			try { if (_vis[k].Root != null) Object.Destroy(_vis[k].Root); } catch { }
+			_vis.Remove(k);
+		}
+	}
+
+	// ------------------------------------------------------------------ weapons
+
+	private static void Gunner(HumanCharacterController pc, BasicVehicle v, float now)
+	{
+		if (!_vis.TryGetValue(v.Pointer, out Vis x)) return;
+		var boxes = AmmoSources(pc, v);
+		int rockets = Rockets.Find() ? Count(boxes, Rockets.AmmoId) : 0;
+		string rocketTxt = !Rockets.Find() ? "no rockets found in this game" : (TankPlugin.RocketsNeedAmmo.Value ? rockets.ToString() : "unlimited");
+		float reload = Mathf.Max(0f, _cannonAt - now);
+		Status = $"Tank  |  LMB main gun (rockets: {rocketTxt}{(reload > 0f ? $", loading {reload:0.0}s" : "")})  |  RMB machine gun  |  fuel {Fuel(v):0.#} / {Cap(v.vehicleData):0} L";
+		if (!MouseFree()) return;
+		if (Input.GetMouseButton(0) && now >= _cannonAt) FireCannon(pc, v, x, boxes, now);
+		if (Input.GetMouseButton(1) && now >= _mgAt) FireMg(pc, v, x, boxes, now);
+	}
+
+	private static void FireCannon(HumanCharacterController pc, BasicVehicle v, Vis x, List<InventoryData> boxes, float now)
+	{
+		_cannonAt = now + Mathf.Max(0.2f, TankPlugin.ReloadSeconds.Value);
+		if (!Rockets.Find())
+		{
+			Msg("The main gun found no rockets in this game (see BepInEx\\Tank.log)");
+			return;
+		}
+		if (TankPlugin.RocketsNeedAmmo.Value && AutoIO.Take(boxes, Rockets.AmmoId, 1f) < 1f)
+		{
+			Msg($"No rockets: put {Rockets.AmmoName} in the tank's cargo or your backpack");
+			_cannonAt = now + 0.6f;
+			return;
+		}
+		float s = TankPlugin.TankScale.Value;
+		float ang = x.TurretPivot.eulerAngles.z;
+		Vector2 dir = Dir(ang);
+		Vector2 piv = x.TurretPivot.position;
+		Vector2 muzzle = piv + dir * (BarrelLen * s + 0.35f);
+		float dist = Mathf.Max(((Mouse() - piv).magnitude) - BarrelLen * s, 3f);
+		Vector2 target = muzzle + dir * dist;
+		if (Rockets.Launch(pc, muzzle, target, ang))
+		{
+			TankFx.Blast(muzzle, ang, _sortLayer);
+			TankAudio.Cannon(muzzle);
+			try { GameController.instance.PlayerNoise(muzzle, TankPlugin.NoiseRadius.Value * 1.5f, false, true, pc.characterData.zLevel, null); } catch { }
+		}
+		else
+		{
+			Msg("The rocket failed to launch (see BepInEx\\Tank.log)");
+		}
+	}
+
+	// The roof gun works like the helicopter's door gun: it locks on to the hostile nearest
+	// the mouse pointer and hits it directly, with a tracer.
+	private static readonly int[] MgAmmo = { 102, 104 };
+
+	private static void FireMg(HumanCharacterController pc, BasicVehicle v, Vis x, List<InventoryData> boxes, float now)
+	{
+		_mgAt = now + 1f / Mathf.Max(1f, TankPlugin.MgRate.Value);
+		if (TankPlugin.MgNeedsAmmo.Value)
+		{
+			bool got = false;
+			foreach (int id in MgAmmo) if (AutoIO.Take(boxes, id, 1f) >= 1f) { got = true; break; }
+			if (!got)
+			{
+				Msg("No machine gun ammo: put 5.56mm or 7.62x39mm rounds in the cargo or your backpack");
+				_mgAt = now + 1f;
+				return;
+			}
+		}
+		float s = TankPlugin.TankScale.Value;
+		float ang = x.MgPivot.eulerAngles.z;
+		Vector2 mp = x.MgPivot.position;
+		Vector2 muzzle = mp + Dir(ang) * MgLen * s;
+		Vector2 aim = Mouse();
+		if ((aim - muzzle).magnitude > TankPlugin.MgRange.Value) aim = muzzle + (aim - muzzle).normalized * TankPlugin.MgRange.Value;
+		Vector2 hitAt = aim;
+		bool hit = false;
+		try
+		{
+			BasicCharacterController best = null;
+			CharacterBodyPart part = null;
+			float bd = float.MaxValue;
+			foreach (Collider2D c in Physics2D.OverlapCircleAll(aim, TankPlugin.MgAimRadius.Value))
+			{
+				if (c == null) continue;
+				CharacterBodyPart bp = c.GetComponent<CharacterBodyPart>();
+				BasicCharacterController ch = bp != null ? bp.character : c.GetComponentInParent<BasicCharacterController>();
+				if (ch == null || ch.Pointer == pc.Pointer || ch.deadFlag || !Hostile(ch)) continue;
+				float d = ((Vector2)ch.transform.position - aim).sqrMagnitude;
+				if (d < bd) { bd = d; best = ch; part = bp; }
+			}
+			if (best != null && Random.value < 0.85f)
+			{
+				if (part == null) part = best.GetComponentInChildren<CharacterBodyPart>();
+				hitAt = (Vector2)best.transform.position + Random.insideUnitCircle * 0.2f;
+				best.OnHit(TankPlugin.MgDamage.Value, hitAt, (hitAt - muzzle).normalized * 4f, part, 1f, true, false, true, false);
+				hit = true;
+			}
+			else
+			{
+				hitAt += Random.insideUnitCircle * TankPlugin.MgSpread.Value;
+			}
+		}
+		catch (Exception e)
+		{
+			if (_hitLog++ < 5) TLog.Warn("mg hit: " + e.Message);
+		}
+		TankAudio.Mg(muzzle);
+		try { GameController.instance.PlayerNoise(hitAt, TankPlugin.NoiseRadius.Value, false, true, pc.characterData.zLevel, null); } catch { }
+		TankFx.Shot(muzzle, hitAt, hit, ang, 0.3f, _sortLayer);
+	}
+
+	internal static bool Hostile(BasicCharacterController ch)
+	{
+		try
+		{
+			if (BasicCharacterController.IsPlayerSideCharacter(ch)) return false;
+			GOAPAgent ag = ch.GetComponent<GOAPAgent>();
+			if (ag != null && ag.IsPlayerTeammate()) return false;
+			if (ch.GetComponent<ZombieController>() != null) return true;
+			bool camp = false;
+			try { camp = BasicCharacterController.IsHostileCamp(ch.characterData); } catch { }
+			bool human = ch.GetComponent<HumanCharacterController>() != null;
+			return camp || !human || (ag != null && ag.isBanditAgent);
+		}
+		catch { return false; }
+	}
+}
