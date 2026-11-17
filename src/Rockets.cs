@@ -17,6 +17,7 @@ internal static class Rockets
 	internal static int LauncherId = -1;
 	internal static string AmmoName = "rockets";
 	internal static string FireClipName;
+	internal static ItemAttr_RangedWeapon Launcher;
 	private static float _speed = 40f;
 
 	internal static bool Find()
@@ -48,6 +49,7 @@ internal static class Rockets
 				_prefab = go;
 				AmmoId = w.ammoId;
 				LauncherId = w.itemId;
+				Launcher = w;
 				if (w.bulletSpeed > 1f) _speed = w.bulletSpeed;
 				try { FireClipName = w.fireClip; } catch { }
 				try { AmmoName = im.FindItemAttrById(AmmoId)?.ItemName_EN ?? AmmoName; } catch { }

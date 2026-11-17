@@ -29,7 +29,7 @@ internal static partial class Tank
 	private const int Frames = 32;
 	private const int HullCell = 216, TurretCell = 360;
 	private const float PxPerDm = 2.3f;                     // render scale: pixels per decimetre
-	private static readonly float Tilt = 40f * Mathf.Deg2Rad;  // render camera tilt from straight down
+	private static readonly float Tilt = 45f * Mathf.Deg2Rad;  // render camera tilt from straight down (the game's car camera is 45)
 	private static readonly Vector3 BarrelTip = new Vector3(76f, 0f, 18f);   // model space, decimetres
 	private static readonly Vector3 MgTip = new Vector3(12f, 7f, 23f);
 	private static readonly Vector3 RingTop = new Vector3(0f, 0f, 18f);
@@ -61,7 +61,9 @@ internal static partial class Tank
 	private static float _callWait;
 	private static float _cannonAt;
 	private static float _mgAt;
-	private static float _fwd;
+	// The base car's nose direction in its own space. 180 is what the pickup (the base car in
+	// this game version) uses; it's confirmed from the headlights and cached in Tank.forward.txt.
+	private static float _fwd = 180f;
 	private static bool _fwdKnown;
 	private static int _baseId = -1;
 	private static int _sortLayer;
@@ -79,6 +81,23 @@ internal static partial class Tank
 	public static bool Crewing => _mine != null;
 
 	private static string FilePath => Path.Combine(Paths.ConfigPath, $"Tank.{_saveId}.txt");
+	private static string FwdPath => Path.Combine(Paths.ConfigPath, "Tank.forward.txt");
+
+	private static void LoadForward()
+	{
+		try
+		{
+			if (_fwdKnown || !File.Exists(FwdPath)) return;
+			string[] a = File.ReadAllText(FwdPath).Trim().Split('|');
+			if (a.Length >= 2 && int.Parse(a[0], CI) == BaseId())
+			{
+				_fwd = F(a[1]);
+				_fwdKnown = true;
+				TLog.Info($"Base car nose direction {_fwd:0} (cached)");
+			}
+		}
+		catch { }
+	}
 
 	// ------------------------------------------------------------------ messages
 
@@ -570,6 +589,7 @@ internal static partial class Tank
 			if (_fwd <= -180f) _fwd += 360f;
 			_fwdKnown = true;
 			_dirty = true;
+			try { File.WriteAllText(FwdPath, $"{BaseId()}|{_fwd.ToString("0", CI)}"); } catch { }
 			TLog.Info($"Base car nose points {_fwd:0} degrees in its own space");
 		}
 		catch (Exception e) { TLog.Warn("forward: " + e.Message); }
@@ -749,6 +769,7 @@ internal static partial class Tank
 			catch { }
 		}
 		if (!Sprites()) return;
+		LoadForward();
 		float now = Time.realtimeSinceStartup;
 		if (now >= _scanAt)
 		{

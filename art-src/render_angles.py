@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
-TILT = math.radians(40)   # camera tilt from straight down
+TILT = math.radians(45)   # camera tilt from straight down (the game's car camera: 45)
 PX = 2.3                  # pixels per decimetre
 FRAMES = 32
 LIGHT = np.array([-0.45, 0.55, 0.70]); LIGHT /= np.linalg.norm(LIGHT)
