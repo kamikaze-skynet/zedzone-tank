@@ -25,7 +25,7 @@ Settings are in `BepInEx\config\girthy_mods.zedzone.tank.cfg` (or the F11 Mod Me
 dotnet build src\Tank.csproj -c Release -p:GameDir="D:\SteamLibrary\steamapps\common\ZED ZONE" -p:CopyToMods=true
 ```
 
-The art is drawn by `art-src/make_art.py` (Python + Pillow): `python art-src/make_art.py src` rewrites the three sprites (they are then renamed `art.tank_*.png`).
+The art works like the game's own cars: the tank is a 3D block model (`art-src/render_angles.py`, Python + NumPy + Pillow) pre-rendered from a tilted overhead view at 32 headings for the hull and 32 for the turret. In game the mod shows the hull frame that matches the tank's heading and the turret frame that matches where it aims. `python art-src/render_angles.py src` rewrites both sprite sheets.
 
 ## Credits
 

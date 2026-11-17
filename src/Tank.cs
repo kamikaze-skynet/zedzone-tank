@@ -20,24 +20,29 @@ internal static partial class Tank
 {
 	public const int NameId = 88040;
 
-	// Sprite layout, in pixels of the art (32 px = 1 tile at scale 1).
+	// The art is a 3D block model pre-rendered from the game's tilted overhead view at 32
+	// headings (art-src/render_angles.py), like the game's cars, which are 3D models filmed
+	// from above. Hull and turret are separate sheets of 8 x 4 frames; frame i faces
+	// i * 11.25 degrees. Both share the same ground origin at each frame's centre (the turret
+	// ring sits at the hull's centre).
 	private const float Ppu = 32f;
-	private static readonly Vector2 TurretOnHull = new Vector2(8f, 0f) / Ppu;      // turret ring centre vs hull centre
-	private static readonly Vector2 MgOnTurret = new Vector2(-14f, -14f) / Ppu;    // loader hatch vs turret ring
-	private const float BarrelLen = 156f / Ppu;                                    // turret ring to muzzle
-	private const float MgLen = 42f / Ppu;
+	private const int Frames = 32;
+	private const int HullCell = 216, TurretCell = 360;
+	private const float PxPerDm = 2.3f;                     // render scale: pixels per decimetre
+	private static readonly float Tilt = 40f * Mathf.Deg2Rad;  // render camera tilt from straight down
+	private static readonly Vector3 BarrelTip = new Vector3(76f, 0f, 18f);   // model space, decimetres
+	private static readonly Vector3 MgTip = new Vector3(12f, 7f, 23f);
+	private static readonly Vector3 RingTop = new Vector3(0f, 0f, 18f);
 
 	private class Vis
 	{
 		public GameObject Root;
 		public SpriteRenderer Hull;
-		public Transform TurretPivot;
+		public SpriteRenderer HullShadow;
 		public SpriteRenderer Turret;
-		public SpriteRenderer TurretShadow;
-		public Transform MgPivot;
-		public SpriteRenderer Mg;
 		public float TurretRel;   // turret angle relative to the hull (degrees)
-		public float MgRel;       // machine gun angle relative to the turret
+		public float TurretWorld; // turret world angle (degrees), updated each frame
+		public float Heading;
 		public readonly List<Renderer> Hidden = new List<Renderer>();
 		public float NextHide;
 	}
@@ -61,7 +66,7 @@ internal static partial class Tank
 	private static int _baseId = -1;
 	private static int _sortLayer;
 	private static bool _sortSet;
-	private static Sprite _hullSp, _turretSp, _mgSp;
+	private static Sprite[] _hullFr, _turretFr;
 	private static bool _spriteTried;
 	private static string _msg;
 	private static float _msgUntil;
@@ -588,24 +593,33 @@ internal static partial class Tank
 
 	// ------------------------------------------------------------------ art
 
-	private static Sprite LoadSprite(string name, Vector2 pivot)
+	private static Sprite[] LoadSheet(string name, int cell)
 	{
-		using Stream s = typeof(Tank).Assembly.GetManifestResourceStream("art." + name + ".png");
-		if (s == null) return null;
-		byte[] b = new byte[s.Length];
+		using Stream st = typeof(Tank).Assembly.GetManifestResourceStream("art." + name + ".png");
+		if (st == null) return null;
+		byte[] b = new byte[st.Length];
 		int r;
 		for (int i = 0; i < b.Length; i += r)
 		{
-			r = s.Read(b, i, b.Length - i);
+			r = st.Read(b, i, b.Length - i);
 			if (r <= 0) break;
 		}
 		var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
 		tex.hideFlags = HideFlags.HideAndDontSave;
 		ImageConversion.LoadImage(tex, (Il2CppStructArray<byte>)b);
 		tex.filterMode = FilterMode.Point;
-		Sprite sp = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), pivot, Ppu);
-		sp.hideFlags = HideFlags.HideAndDontSave;
-		return sp;
+		int cols = tex.width / cell, rows = tex.height / cell;
+		if (cols * rows < Frames) { TLog.Warn($"{name}: sheet is {tex.width}x{tex.height}, expected {Frames} frames of {cell}px"); return null; }
+		var fr = new Sprite[Frames];
+		for (int i = 0; i < Frames; i++)
+		{
+			int cx = i % cols, cy = i / cols;
+			// texture rows start at the bottom, the sheet's first row is at the top
+			var rect = new Rect(cx * cell, tex.height - (cy + 1) * cell, cell, cell);
+			fr[i] = Sprite.Create(tex, rect, new Vector2(0.5f, 0.5f), Ppu);
+			fr[i].hideFlags = HideFlags.HideAndDontSave;
+		}
+		return fr;
 	}
 
 	private static bool Sprites()
@@ -615,14 +629,30 @@ internal static partial class Tank
 			_spriteTried = true;
 			try
 			{
-				_hullSp = LoadSprite("tank_hull", new Vector2(0.5f, 0.5f));
-				_turretSp = LoadSprite("tank_turret", new Vector2(64f / 224f, 0.5f));
-				_mgSp = LoadSprite("tank_mg", new Vector2(12f / 56f, 0.5f));
-				TLog.Info($"Art loaded: hull {_hullSp != null}, turret {_turretSp != null}, mg {_mgSp != null}");
+				_hullFr = LoadSheet("tank_hull32", HullCell);
+				_turretFr = LoadSheet("tank_turret32", TurretCell);
+				TLog.Info($"Art loaded: hull {_hullFr != null}, turret {_turretFr != null}");
 			}
 			catch (Exception e) { TLog.Warn("art: " + e.Message); }
 		}
-		return _hullSp != null && _turretSp != null && _mgSp != null;
+		return _hullFr != null && _turretFr != null;
+	}
+
+	private static int FrameOf(float deg)
+	{
+		int f = Mathf.RoundToInt(Mathf.Repeat(deg, 360f) / (360f / Frames));
+		return f % Frames;
+	}
+
+	// Where a point of the 3D model (decimetres, model space at heading deg) lands on screen,
+	// in world units from the tank's ground position.
+	private static Vector2 Project(Vector3 m, float deg)
+	{
+		float a = deg * Mathf.Deg2Rad;
+		float rx = m.x * Mathf.Cos(a) - m.y * Mathf.Sin(a);
+		float ry = m.x * Mathf.Sin(a) + m.y * Mathf.Cos(a);
+		float sy = ry * Mathf.Cos(Tilt) + m.z * Mathf.Sin(Tilt);
+		return new Vector2(rx, sy) * (PxPerDm / Ppu * TankPlugin.TankScale.Value);
 	}
 
 	private static SpriteRenderer NewSr(string name, Sprite sp, Transform parent, int order)
@@ -642,23 +672,11 @@ internal static partial class Tank
 		int o = TankPlugin.SortingOrder.Value;
 		x = new Vis();
 		x.Root = new GameObject("zt_tank");
-		var hs = NewSr("hull_shadow", _hullSp, x.Root.transform, o - 1);
-		hs.color = new Color(0.03f, 0.04f, 0.02f, 0.4f);
-		hs.transform.localPosition = new Vector3(0.12f, -0.12f, 0f);
-		x.Hull = NewSr("hull", _hullSp, x.Root.transform, o);
-		var tp = new GameObject("turret_pivot");
-		tp.transform.SetParent(x.Root.transform, false);
-		tp.transform.localPosition = TurretOnHull;
-		x.TurretPivot = tp.transform;
-		x.TurretShadow = NewSr("turret_shadow", _turretSp, x.TurretPivot, o + 1);
-		x.TurretShadow.color = new Color(0f, 0f, 0f, 0.35f);
-		x.TurretShadow.transform.localPosition = new Vector3(0.07f, -0.07f, 0f);
-		x.Turret = NewSr("turret", _turretSp, x.TurretPivot, o + 2);
-		var mp = new GameObject("mg_pivot");
-		mp.transform.SetParent(x.TurretPivot, false);
-		mp.transform.localPosition = MgOnTurret;
-		x.MgPivot = mp.transform;
-		x.Mg = NewSr("mg", _mgSp, x.MgPivot, o + 3);
+		x.HullShadow = NewSr("hull_shadow", _hullFr[0], x.Root.transform, o - 1);
+		x.HullShadow.color = new Color(0.03f, 0.04f, 0.02f, 0.35f);
+		x.HullShadow.transform.localPosition = new Vector3(0.18f, -0.14f, 0f);
+		x.Hull = NewSr("hull", _hullFr[0], x.Root.transform, o);
+		x.Turret = NewSr("turret", _turretFr[0], x.Root.transform, o + 2);
 		float s = TankPlugin.TankScale.Value;
 		x.Root.transform.localScale = new Vector3(s, s, 1f);
 		_vis[v.Pointer] = x;
@@ -793,23 +811,23 @@ internal static partial class Tank
 				Vector2 p = VehPos(v);
 				float h = Heading(v);
 				x.Root.transform.position = new Vector3(p.x, p.y, v.transform.position.z - 0.5f);
-				x.Root.transform.rotation = Quaternion.Euler(0f, 0f, h);
+				x.Root.transform.localScale = new Vector3(TankPlugin.TankScale.Value, TankPlugin.TankScale.Value, 1f);
+				x.Heading = h;
 				if (_mine != null && v.Pointer == _mine.Pointer)
 				{
-					// turret turns toward the mouse at its traverse speed; the roof gun snaps faster
-					Vector2 piv = x.TurretPivot.position;
+					// the turret turns toward the mouse at its traverse speed
+					Vector2 piv = p + Project(RingTop, 0f);
 					float want = Mathf.Atan2(mouse.y - piv.y, mouse.x - piv.x) * Mathf.Rad2Deg;
 					float cur = h + x.TurretRel;
 					float next = Mathf.MoveTowardsAngle(cur, want, TankPlugin.TurretSpeed.Value * dt);
 					x.TurretRel = Mathf.DeltaAngle(0f, next - h);
-					Vector2 mp = x.MgPivot.position;
-					float mwant = Mathf.Atan2(mouse.y - mp.y, mouse.x - mp.x) * Mathf.Rad2Deg;
-					float mcur = h + x.TurretRel + x.MgRel;
-					float mnext = Mathf.MoveTowardsAngle(mcur, mwant, 360f * dt);
-					x.MgRel = Mathf.DeltaAngle(0f, mnext - h - x.TurretRel);
 				}
-				x.TurretPivot.localRotation = Quaternion.Euler(0f, 0f, x.TurretRel);
-				x.MgPivot.localRotation = Quaternion.Euler(0f, 0f, x.MgRel);
+				x.TurretWorld = h + x.TurretRel;
+				Sprite hs = _hullFr[FrameOf(h)];
+				if (x.Hull.sprite != hs) { x.Hull.sprite = hs; x.HullShadow.sprite = hs; }
+				Sprite ts = _turretFr[FrameOf(x.TurretWorld)];
+				if (x.Turret.sprite != ts) x.Turret.sprite = ts;
+				LogCamera(v);
 			}
 		}
 		var drop = new List<IntPtr>();
@@ -819,6 +837,23 @@ internal static partial class Tank
 			try { if (_vis[k].Root != null) Object.Destroy(_vis[k].Root); } catch { }
 			_vis.Remove(k);
 		}
+	}
+
+	// Logs the game's car camera angle once, to match the art's tilt to it.
+	private static bool _camLogged;
+
+	private static void LogCamera(BasicVehicle v)
+	{
+		if (_camLogged) return;
+		_camLogged = true;
+		try
+		{
+			Camera c = v.vehicleCamera ?? v.vehicleCameraRef;
+			if (c == null) { TLog.Info("Car camera: none on the base car"); return; }
+			Transform t = c.transform;
+			TLog.Info($"Car camera: euler {t.eulerAngles}, local euler {t.localEulerAngles}, local pos {t.localPosition}, ortho {c.orthographic} size {c.orthographicSize:0.##}, fov {c.fieldOfView:0.#}");
+		}
+		catch (Exception e) { TLog.Info("Car camera: " + e.Message); }
 	}
 
 	// ------------------------------------------------------------------ weapons
@@ -850,12 +885,13 @@ internal static partial class Tank
 			_cannonAt = now + 0.6f;
 			return;
 		}
-		float s = TankPlugin.TankScale.Value;
-		float ang = x.TurretPivot.eulerAngles.z;
+		// the barrel points along the turret's actual angle; the rocket leaves from its drawn tip
+		float ang = x.TurretWorld;
 		Vector2 dir = Dir(ang);
-		Vector2 piv = x.TurretPivot.position;
-		Vector2 muzzle = piv + dir * (BarrelLen * s + 0.35f);
-		float dist = Mathf.Max(((Mouse() - piv).magnitude) - BarrelLen * s, 3f);
+		Vector2 pos = VehPos(v);
+		Vector2 piv = pos + Project(RingTop, 0f);
+		Vector2 muzzle = pos + Project(BarrelTip, ang) + dir * 0.3f;
+		float dist = Mathf.Max((Mouse() - muzzle).magnitude, 3f);
 		Vector2 target = muzzle + dir * dist;
 		if (Rockets.Launch(pc, muzzle, target, ang))
 		{
@@ -887,11 +923,9 @@ internal static partial class Tank
 				return;
 			}
 		}
-		float s = TankPlugin.TankScale.Value;
-		float ang = x.MgPivot.eulerAngles.z;
-		Vector2 mp = x.MgPivot.position;
-		Vector2 muzzle = mp + Dir(ang) * MgLen * s;
+		Vector2 muzzle = VehPos(v) + Project(MgTip, x.TurretWorld);
 		Vector2 aim = Mouse();
+		float ang = Mathf.Atan2(aim.y - muzzle.y, aim.x - muzzle.x) * Mathf.Rad2Deg;
 		if ((aim - muzzle).magnitude > TankPlugin.MgRange.Value) aim = muzzle + (aim - muzzle).normalized * TankPlugin.MgRange.Value;
 		Vector2 hitAt = aim;
 		bool hit = false;

@@ -48,7 +48,7 @@ public class TankPlugin : BasePlugin
 		MaxTanks = Config.Bind("General", "MaxTanks", 1, new ConfigDescription("How many tanks each save can call in with the key. 0 = no limit. (Spawn Menu's Tank kit ignores this.)", new AcceptableValueRange<int>(0, 20)));
 		NearbyRadius = Config.Bind("General", "NearbyRadius", 30f, new ConfigDescription("You can't call another tank while one is parked this close (tiles).", new AcceptableValueRange<float>(0f, 500f)));
 		StartFuel = Config.Bind("General", "StartFuel", 0.5f, new ConfigDescription("How full a new tank's fuel tank is (0 to 1).", new AcceptableValueRange<float>(0f, 1f)));
-		TankScale = Config.Bind("Look", "Scale", 1.25f, new ConfigDescription("Size of the tank's art.", new AcceptableValueRange<float>(0.5f, 3f)));
+		TankScale = Config.Bind("Look", "Scale", 1.1f, new ConfigDescription("Size of the tank's art.", new AcceptableValueRange<float>(0.5f, 3f)));
 		SortingOrder = Config.Bind("Look", "SortingOrder", 32000, "Draw order of the tank's art (higher draws on top of more things).");
 		CrewDamage = Config.Bind("Armor", "CrewDamageTaken", 0.1f, new ConfigDescription("Share of damage that reaches the crew inside (a car is much higher).", new AcceptableValueRange<float>(0f, 1f)));
 		TurretSpeed = Config.Bind("MainGun", "TurretTurnSpeed", 120f, "How fast the turret turns toward the mouse (degrees per second).");
