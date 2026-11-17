@@ -4,7 +4,7 @@ A drivable main battle tank for ZED ZONE. BepInEx IL2CPP plugin, GUID `girthy_mo
 
 ## How to use
 
-- **Page Up** puts a tank a few tiles in front of you (one per save by default, see `MaxTanks`).
+- **Build a Tank Kit** at a workbench (60 Iron Plate, 20 Metal Component, 10 Copper Tube, 20 Iron Wire, 10 Copper Wire). Carry it and press **Page Up**: the tank is assembled a few tiles in front of you and the kit is used up. Turn off `RequireTankKit` for free call-ins (then one per save, see `MaxTanks`).
 - Get in like any car, start the engine and drive with the usual car keys. It is one of the game's own cars underneath, so it **burns gasoline from its fuel tank exactly like the game's cars** and refuels the same way. **Shift + Page Up** next to it pours the gas cans you carry into it.
 - While you drive, the **turret turns toward your mouse** (at a set traverse speed).
   - **Left click** fires the main gun: a **105 mm Tank Shell** (a new ammo item this mod adds; it spawns in rooms and can be crafted). Each shot uses one shell from the tank's cargo hold or your backpack (setting `MainGun.UseAmmo`), reload 2.5 s.

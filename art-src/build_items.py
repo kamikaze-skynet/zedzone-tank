@@ -1,4 +1,4 @@
-"""Draws the 105 mm tank shell (our own art) and packs it as a game item mod (.zedmod =
+"""Draws the 105 mm tank shell and the Tank Kit (our own art) and packs them as game item mods (.zedmod =
 zip of mod.json + sprite.png + preview.jpg + locale) into workshop/content/Tank/items/Ammo/.
 The plugin loads that file next to Tank.dll (src/Bundled.cs), so every install route works.
 Run:  python art-src/build_items.py"""
@@ -7,16 +7,23 @@ from PIL import Image, ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.join(HERE, "..")
-ART = os.path.join(REPO, "items", "Ammo", "shell105")
-OUT = os.path.join(REPO, "workshop", "content", "Tank", "items", "Ammo")
 
 # Never change the guid after release: saves and other mods refer to it.
 GUID = "3f7c1d05-a105-4c2b-9e10-105a7a4c0105"
 RID = 881105  # requested runtime id; the game's loader remaps it if it clashes
+KIT_GUID = "9b2e4f1a-7a4c-4d1e-8c3b-7a4c0e7a4c01"
+KIT_RID = 881106
+KIT_NAME = "Tank Kit"
+KIT_DESC = ("Everything needed to put a main battle tank together: armour plate, a diesel power pack, tracks and a turret, "
+            "packed in one heavy crate. Built at a workbench. Carry it and press Page Up to have the tank assembled "
+            "in front of you; the kit is used up.")
 NAME = "105 mm Tank Shell"
 DESC = ("A 105 mm high-explosive anti-tank round for the tank's main gun. A brass case full of propellant "
         "and a shaped-charge warhead with a long stand-off probe on the nose. Load it into the tank's cargo or "
         "carry it in your backpack; each shot uses one. Heavy: you won't carry many on foot.")
+
+# Iron Plate, Metal Component, Copper Tube, Iron Wire, Copper Wire
+KIT_RECIPE = [(8, 60), (62, 20), (11, 10), (12, 20), (13, 10)]
 
 W, H = 512, 128  # sprite, drawn pointing right (+x), nose at the right
 
@@ -50,20 +57,60 @@ def draw_shell(scale=1):
     d.polygon([(488 * s, cy - 8 * s), (504 * s, cy), (488 * s, cy + 8 * s)], fill=(60, 62, 58, 255), outline=(20, 20, 20, 255))
     return im
 
-def main():
-    os.makedirs(ART, exist_ok=True)
-    os.makedirs(OUT, exist_ok=True)
-    sprite = draw_shell(1)
-    sprite.save(os.path.join(ART, "sprite.png"))
-    big = draw_shell(1).resize((480, 120), Image.LANCZOS)
+def draw_kit():
+    im = Image.new("RGBA", (256, 192), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    ol = (24, 26, 16, 255)
+    d.rectangle([8, 24, 248, 184], fill=(92, 100, 56, 255), outline=ol, width=4)      # crate
+    for x in (8, 244):
+        d.rectangle([x, 24, x + 4, 184], fill=(70, 76, 42, 255))
+    for y in (60, 148):
+        d.rectangle([8, y, 248, y + 8], fill=(70, 76, 42, 255), outline=ol, width=1)  # slats
+    d.rectangle([8, 8, 248, 30], fill=(104, 112, 64, 255), outline=ol, width=4)       # lid
+    for x in (40, 216):
+        d.rectangle([x - 10, 4, x + 10, 34], fill=(60, 60, 56, 255), outline=ol, width=2)  # latches
+    # stencilled tank silhouette (side view) and text
+    st = (210, 200, 150, 255)
+    d.rectangle([62, 104, 194, 128], fill=st)          # hull
+    d.polygon([(54, 110), (62, 104), (62, 128), (54, 122)], fill=st)
+    d.rectangle([96, 88, 154, 104], fill=st)           # turret
+    d.rectangle([154, 93, 214, 98], fill=st)           # barrel
+    for cx in range(74, 190, 20):
+        d.ellipse([cx - 8, 124, cx + 8, 140], fill=st)  # road wheels
+    d.text((96, 40), "TANK KIT", fill=st)
+    d.text((100, 156), "105 MM", fill=st)
+    return im
+
+def pack(key, kind, data, sprite, preview):
+    art = os.path.join(REPO, "items", kind, key)
+    os.makedirs(art, exist_ok=True)
+    out = os.path.join(REPO, "workshop", "content", "Tank", "items", kind)
+    os.makedirs(out, exist_ok=True)
+    sprite.save(os.path.join(art, "sprite.png"))
+    preview.save(os.path.join(art, "preview.jpg"), quality=92)
+    guid = data["modGuid"]
+    locale = {"langCode": "en_US", "modGuid": guid, "translatorNote": "", "itemName": data["itemName"],
+              "itemDescription": data["itemDescription"], "extraFields": []}
+    path = os.path.join(out, guid + ".zedmod")
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("mod.json", json.dumps(data, indent=4, ensure_ascii=False))
+        z.write(os.path.join(art, "sprite.png"), "sprite.png")
+        z.write(os.path.join(art, "preview.jpg"), "preview.jpg")
+        z.writestr("locale/en_US.json", json.dumps(locale, indent=4, ensure_ascii=False))
+    print("built", os.path.relpath(path, REPO), data["itemName"])
+
+def preview_of(img, size, label):
     prev = Image.new("RGB", (512, 512), (34, 38, 30))
     pd = ImageDraw.Draw(prev)
     for y in range(0, 512, 32):
         pd.line([(0, y), (512, y)], fill=(40, 45, 36))
-    prev.paste(big, (16, 196), big)
-    pd.text((20, 360), "105 mm", fill=(220, 200, 120))
-    prev.save(os.path.join(ART, "preview.jpg"), quality=92)
+    big = img.resize(size, Image.LANCZOS)
+    prev.paste(big, ((512 - size[0]) // 2, (512 - size[1]) // 2), big)
+    pd.text((20, 470), label, fill=(220, 200, 120))
+    return prev
 
+def main():
+    shell = draw_shell(1)
     d = {
         "modType": "Ammo", "modGuid": GUID, "runtimeId": RID, "publishMode": 0, "targetNativeItemId": 0,
         "primaryLangCode": "en_US", "spritePath": "sprite.png", "ppu": 640,
@@ -78,15 +125,26 @@ def main():
         "repairRecipeItems": [{"itemId": 56, "itemNumber": 1.0}],
         "ammoNumber": 2, "ammoBaseDamage": 3000.0,
     }
-    locale = {"langCode": "en_US", "modGuid": GUID, "translatorNote": "", "itemName": NAME,
-              "itemDescription": DESC, "extraFields": []}
-    path = os.path.join(OUT, GUID + ".zedmod")
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("mod.json", json.dumps(d, indent=4, ensure_ascii=False))
-        z.write(os.path.join(ART, "sprite.png"), "sprite.png")
-        z.write(os.path.join(ART, "preview.jpg"), "preview.jpg")
-        z.writestr("locale/en_US.json", json.dumps(locale, indent=4, ensure_ascii=False))
-    print("built", os.path.relpath(path, REPO))
+    pack("shell105", "Ammo", d, shell, preview_of(shell, (480, 120), "105 mm"))
+
+    kit = draw_kit()
+    # The kit is an Ammo-type item only because that type is a plain stackable item; no gun uses it.
+    # Recipe (game ids confirmed in game): Iron Plate 8, Copper Tube 11, Iron Wire 12, Copper Wire 13,
+    # Metal Component 62. Built at the workbench (craftPlatform 2, same as the Boltgun guns).
+    k = {
+        "modType": "Ammo", "modGuid": KIT_GUID, "runtimeId": KIT_RID, "publishMode": 0, "targetNativeItemId": 0,
+        "primaryLangCode": "en_US", "spritePath": "sprite.png", "ppu": 256,
+        "spriteRegions": [{"slotName": "Main", "region": {"x": 6, "y": 2, "w": 244, "h": 184}}],
+        "itemName": KIT_NAME, "itemName_EN": KIT_NAME, "itemDescription": KIT_DESC, "itemDescription_EN": KIT_DESC,
+        "itemRarity": 0.99, "hiddenItem": False, "itemInventorySizeX": 4, "itemInventorySizeY": 3,
+        "generateItemInRoom": False, "generateItemInField": False, "generateItemInCoastFloat": 0.0,
+        "weight": 40.0, "itemPrice": 20000.0, "stackNumber": 1,
+        "craftRecipeItems": [{"itemId": i, "itemNumber": float(n)} for i, n in KIT_RECIPE],
+        "craftPlatform": 2, "craftAudioType": 0, "craftOutputNumber": 1,
+        "repairRecipeItems": [{"itemId": 8, "itemNumber": 1.0}],
+        "ammoNumber": 1, "ammoBaseDamage": 0.0,
+    }
+    pack("tankkit", "Ammo", k, kit, preview_of(kit, (384, 288), "Tank Kit"))
 
 if __name__ == "__main__":
     main()

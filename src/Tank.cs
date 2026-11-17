@@ -382,18 +382,27 @@ internal static partial class Tank
 		return v;
 	}
 
-	internal static string CallIn(HumanCharacterController pc, bool ignoreLimit)
+	internal static string CallIn(HumanCharacterController pc, bool ignoreLimit, bool useKit = false)
 	{
 		if (pc == null) return Fail("Load into a world first");
 		try { if (pc.drivingVehicle != null) return Fail("Get out of the vehicle first"); } catch { }
 		if (!Sprites()) return Fail("Tank art failed to load (see BepInEx\\Tank.log)");
 		Vector2 here = pc.transform.position;
 		if (!ignoreLimit && TankNear(here, TankPlugin.NearbyRadius.Value)) return Fail("There's already a tank close by");
+		// With a crafted Tank Kit the kit is the cost, so the per-save limit doesn't apply.
+		int kitId = -1;
+		if (useKit)
+		{
+			kitId = Bundled.KitId();
+			if (kitId <= 0) return Fail("The Tank Kit item didn't load (see BepInEx\\Tank.log)");
+			if (Count(Carried(pc), kitId) < 1) return Fail("You need a Tank Kit: build one at a workbench and carry it");
+		}
 		int max = TankPlugin.MaxTanks.Value;
-		if (!ignoreLimit && max > 0 && _called >= max) return Fail($"This save has already called in {max} tank(s) (setting MaxTanks)");
+		if (!ignoreLimit && !useKit && max > 0 && _called >= max) return Fail($"This save has already called in {max} tank(s) (setting MaxTanks)");
 		Vector2 spot = here + new Vector2(0f, -5f);
 		if (Spawn(spot, 0f) != null)
 		{
+			if (useKit && AutoIO.Take(Carried(pc), kitId, 1f) < 1f) TLog.Warn("Tank Kit: tank delivered but the kit couldn't be taken");
 			_called++;
 			Save();
 			return Ok("Tank delivered. Get in, start the engine and roll out.");
@@ -412,7 +421,7 @@ internal static partial class Tank
 			Refuel(pc);
 			return;
 		}
-		CallIn(pc, false);
+		CallIn(pc, false, TankPlugin.RequireKit.Value);
 	}
 
 	// ------------------------------------------------------------------ fuel (the game's car fuel)
