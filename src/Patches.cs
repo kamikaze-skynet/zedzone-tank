@@ -52,3 +52,30 @@ internal static class P_Name3
 		else if (textid == Tank.NameId3D) __result = "Battle Tank";
 	}
 }
+
+// The tank's storage window is titled with the base car's name ("Pickup"): use the tank's name.
+[HarmonyPatch(typeof(LootInventoryPanel), "OpenPanelCore")]
+internal static class P_LootTitle
+{
+	private static void Prefix(InventoryData m_inventoryData, ref string m_name)
+	{
+		try
+		{
+			if (m_inventoryData == null) return;
+			var live = BasicVehicle.s_liveVehicles;
+			if (live == null) return;
+			for (int i = 0; i < live.Count; i++)
+			{
+				BasicVehicle v = live[i];
+				if (!Tank.IsTank(v)) continue;
+				InventoryData inv = v.vehicleData?.inventoryData;
+				if (inv != null && inv.Pointer == m_inventoryData.Pointer)
+				{
+					m_name = Tank.Is3D(v) ? "Battle Tank" : "Tank";
+					return;
+				}
+			}
+		}
+		catch { }
+	}
+}

@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.5.13";
+	public const string Version = "1.5.14";
 
 	internal static ManualLogSource L;
 
@@ -123,7 +123,7 @@ public class TankPlugin : BasePlugin
 		if (_patched) return;
 		_patched = true;
 		var h = new Harmony(Guid);
-		Type[] types = { typeof(P_MouseDown), typeof(P_MouseHold), typeof(P_Name1), typeof(P_Name2), typeof(P_Name3) };
+		Type[] types = { typeof(P_MouseDown), typeof(P_MouseHold), typeof(P_Name1), typeof(P_Name2), typeof(P_Name3), typeof(P_LootTitle) };
 		int ok = 0;
 		foreach (Type t in types)
 		{

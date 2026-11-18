@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.14
+
+- The tank's storage window is titled "Battle Tank" (or "Tank") instead of the base car's name "Pickup".
+
 ## 1.5.13
 
 - Trees, bushes and buildings in front of the Battle Tank draw over it again. The tank now sits just above the tall grass instead of above everything, and objects standing in front of it that overlap its picture are lifted just above it while they do (BattleTank.SortWithTrees, on).
