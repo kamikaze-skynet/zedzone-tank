@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.7
+
+- Battle Tank paint is bolder: more contrast and colour in the baked camo and the plain parts, and slightly darker, so the tank no longer looks faint on the map.
+
 ## 1.4.6
 
 - Battle Tank see-through fix: the 3D tank was on the map's Vehicle layer, so the main camera drew it straight onto the map (unsorted, see-through, pale) instead of the car camera filming it into the car's picture like every other car. It now goes on the car camera's own layer (VehicleModel).
