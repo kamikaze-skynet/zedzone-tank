@@ -34,7 +34,7 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<float> Model3DSize;
 	internal static ConfigEntry<float> Model3DZoom;
 	internal static ConfigEntry<bool> DrawDiagnostics;
-	internal static ConfigEntry<bool> BaseEnabled;
+	internal static ConfigEntry<bool> BaseEnabled, BasePressGrass;
 	internal static ConfigEntry<float> BaseMass, BaseArmour, BaseTopSpeed, BaseTurn;
 	internal static ConfigEntry<int> Model3DPictureSize;
 	internal static ConfigEntry<float> Model3DNearClip;
@@ -72,6 +72,7 @@ public class TankPlugin : BasePlugin
 		BaseArmour = Config.Bind("BattleTankBase", "Armour", 5f, "Battle Tank bodywork health compared with the pickup.");
 		BaseTopSpeed = Config.Bind("BattleTankBase", "TopSpeed", 0.8f, "Battle Tank top speed compared with the pickup.");
 		BaseTurn = Config.Bind("BattleTankBase", "TurnRate", 1f, "Battle Tank turning speed compared with the pickup.");
+		BasePressGrass = Config.Bind("BattleTankBase", "FlattenGrass", true, "Flatten grass under the whole Battle Tank (the game only flattens it around a car's middle, so tall grass covered most of the tank).");
 		Model3DFlip = Config.Bind("BattleTank", "FlipModel", false, "Turn the 3D model around if it drives backwards.");
 		SortingOrder = Config.Bind("Look", "SortingOrder", 32000, "Draw order of the tank's art (higher draws on top of more things).");
 		CrewDamage = Config.Bind("Armor", "CrewDamageTaken", 0.1f, new ConfigDescription("Share of damage that reaches the crew inside (a car is much higher).", new AcceptableValueRange<float>(0f, 1f)));

@@ -3,6 +3,7 @@
 ## 1.5.0
 
 - Battle Tank gets its own base instead of a plain pickup: the pickup under it now has a hit box the size of the tank (it used to be pickup-sized, so things clipped into the tank), 4x the weight, 5x the bodywork armour and 80% of the top speed. All of it is in the new BattleTankBase config section (Enabled, Weight, Armour, TopSpeed, TurnRate). Tank.log prints a 'Tank base:' line with the before/after values.
+- Tall grass no longer stands over the Battle Tank: grass is flattened under the whole hull every frame (the game only flattens it around a car's middle). Config BattleTankBase.FlattenGrass.
 - The game's own vehicle picture field now points at the tank's sharper picture too.
 
 ## 1.4.9

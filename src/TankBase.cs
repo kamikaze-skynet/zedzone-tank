@@ -67,6 +67,7 @@ internal static class TankBase
 			}
 			if (o.MaxSpeed > 0f && Mathf.Abs(v.maxLinearSpeed - o.SetMaxSpeed) > 0.001f) v.maxLinearSpeed = o.SetMaxSpeed;
 			if (o.MaxTurn > 0f && Mathf.Abs(v.maxAngularSpeed - o.SetMaxTurn) > 0.001f) v.maxAngularSpeed = o.SetMaxTurn;
+			PressGrass(v, col, o);
 			if (!o.Logged)
 			{
 				o.Logged = true;
@@ -75,6 +76,36 @@ internal static class TankBase
 			}
 		}
 		catch (Exception e) { TLog.Warn("Tank base: " + e.Message); }
+	}
+
+	private static bool _grassWarned;
+	private static int _pressFails;
+
+	// The game flattens grass around a car's middle only, so tall grass stood over most of the
+	// big tank. Press it along the whole hull every frame.
+	private static void PressGrass(BasicVehicle v, CapsuleCollider2D col, Orig o)
+	{
+		if (!TankPlugin.BasePressGrass.Value || col == null) return;
+		try
+		{
+			TerrainGrassController g = TerrainGrassController.instance;
+			if (g == null) return;
+			Transform t = col.transform;
+			bool alongX = o.SetSize.x >= o.SetSize.y;
+			float len = alongX ? o.SetSize.x : o.SetSize.y, wid = alongX ? o.SetSize.y : o.SetSize.x;
+			Vector2 axis = alongX ? Vector2.right : Vector2.up;
+			Vector3 ls = t.lossyScale;
+			float r = wid * 0.62f * Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.y));
+			const int n = 5;
+			for (int i = 0; i < n; i++)
+			{
+				float f = (i / (float)(n - 1) - 0.5f) * (len - wid * 0.5f);
+				Vector3 w = t.TransformPoint((Vector3)(col.offset + axis * f));
+				w.z = 0f;
+				if (!g.PressGrass(w, r, 1f) && ++_pressFails == 50) TLog.Info("Tank base: the game's grass pressers are full, some grass may stay up");
+			}
+		}
+		catch (Exception e) { if (!_grassWarned) { _grassWarned = true; TLog.Warn("Tank base grass: " + e.Message); } }
 	}
 
 	internal static void Forget(BasicVehicle v)
