@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1
+
+- The Battle Tank crushes the grass it drives over: every grass tile under the hull is removed for good, so tall grass no longer covers the tank. Pressing the grass (1.5.0) didn't work because the game only allows a few grass pressers at once. Config BattleTankBase.CrushGrass.
+
 ## 1.5.0
 
 - Battle Tank gets its own base instead of a plain pickup: the pickup under it now has a hit box the size of the tank (it used to be pickup-sized, so things clipped into the tank), 4x the weight, 5x the bodywork armour and 80% of the top speed. All of it is in the new BattleTankBase config section (Enabled, Weight, Armour, TopSpeed, TurnRate). Tank.log prints a 'Tank base:' line with the before/after values.

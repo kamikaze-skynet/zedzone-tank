@@ -79,31 +79,39 @@ internal static class TankBase
 	}
 
 	private static bool _grassWarned;
-	private static int _pressFails;
+	private static readonly HashSet<Vector2Int> _tiles = new HashSet<Vector2Int>();
+	private static readonly Dictionary<IntPtr, Vector3> _lastCrush = new Dictionary<IntPtr, Vector3>();
 
-	// The game flattens grass around a car's middle only, so tall grass stood over most of the
-	// big tank. Press it along the whole hull every frame.
+	// Tall grass is drawn over vehicles, and the game only presses it around a car's middle,
+	// so it buried the big tank. A tank crushes the grass it drives over instead: every grass
+	// tile under the hull is removed (and stays removed), like the tracks would.
 	private static void PressGrass(BasicVehicle v, CapsuleCollider2D col, Orig o)
 	{
 		if (!TankPlugin.BasePressGrass.Value || col == null) return;
 		try
 		{
+			Transform t = col.transform;
+			Vector3 here = t.position;
+			if (_lastCrush.TryGetValue(v.Pointer, out Vector3 last) && (last - here).sqrMagnitude < 0.04f) return;
 			TerrainGrassController g = TerrainGrassController.instance;
 			if (g == null) return;
-			Transform t = col.transform;
+			_lastCrush[v.Pointer] = here;
 			bool alongX = o.SetSize.x >= o.SetSize.y;
 			float len = alongX ? o.SetSize.x : o.SetSize.y, wid = alongX ? o.SetSize.y : o.SetSize.x;
-			Vector2 axis = alongX ? Vector2.right : Vector2.up;
-			Vector3 ls = t.lossyScale;
-			float r = wid * 0.62f * Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.y));
-			const int n = 5;
-			for (int i = 0; i < n; i++)
-			{
-				float f = (i / (float)(n - 1) - 0.5f) * (len - wid * 0.5f);
-				Vector3 w = t.TransformPoint((Vector3)(col.offset + axis * f));
-				w.z = 0f;
-				if (!g.PressGrass(w, r, 1f) && ++_pressFails == 50) TLog.Info("Tank base: the game's grass pressers are full, some grass may stay up");
-			}
+			Vector2 la = alongX ? Vector2.right : Vector2.up, wa = alongX ? Vector2.up : Vector2.right;
+			_tiles.Clear();
+			const float step = 0.4f;
+			for (float a = -len * 0.5f; a <= len * 0.5f + 1e-3f; a += step)
+				for (float b = -wid * 0.5f; b <= wid * 0.5f + 1e-3f; b += step)
+				{
+					Vector3 w = t.TransformPoint((Vector3)(col.offset + la * a + wa * b));
+					w.z = 0f;
+					_tiles.Add(TerrainGrassController.WorldPositionToCoordinate(w));
+				}
+			int n = 0;
+			foreach (Vector2Int c in _tiles)
+				if (g.HasGrassAt(c)) { g.RemoveGrassPersistentAt(c, true); n++; }
+			if (n > 0) g.FlushPendingVertexUploads();
 		}
 		catch (Exception e) { if (!_grassWarned) { _grassWarned = true; TLog.Warn("Tank base grass: " + e.Message); } }
 	}
