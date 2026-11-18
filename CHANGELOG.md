@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1
+
+- Battle Tank paint fix: the car shader was still drawing the base car's own colour sheet over the Desert Sentinel, which made it look patchy red, white and blue. Every texture slot of the shader now gets the tank's baked camo (or a solid colour for plain parts).
+
 ## 1.4.0
 - The Battle Tank is now the **Desert Sentinel**, a far more detailed M1-style tank modelled in Blender: angled wedge turret with a gun slot and round mantlet, commander's cupola with six vision blocks and a detailed .50 cal on an armoured cradle, loader's M240 on a swing arm, gunner's sight with open ballistic doors, thermal viewer on a pedestal, flat deck with a short glacis, headlight clusters, tow clevises and shackles, stowed tow cables, full-height side skirts with armour tiles, bustle rack with jerry cans and a spare road wheel.
 - Its camouflage is now painted on: the model carries baked paint textures instead of flat colours (the mod loads UVs and `map_Kd` textures from the model files).

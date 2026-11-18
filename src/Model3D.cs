@@ -262,6 +262,25 @@ internal static class Model3D
 		return b;
 	}
 
+	private static readonly Dictionary<int, Texture2D> _solid = new Dictionary<int, Texture2D>();
+	private static bool _propsLogged;
+
+	// one-pixel-colour texture for parts that have no baked paint
+	private static Texture2D Solid(Color c)
+	{
+		Color32 k = c;
+		int key = (k.r << 16) | (k.g << 8) | k.b;
+		if (_solid.TryGetValue(key, out Texture2D t) && t != null) return t;
+		t = new Texture2D(4, 4, TextureFormat.RGBA32, false);
+		t.hideFlags = HideFlags.HideAndDontSave;
+		for (int y = 0; y < 4; y++) for (int x = 0; x < 4; x++) t.SetPixel(x, y, new Color(c.r, c.g, c.b, 1f));
+		t.wrapMode = TextureWrapMode.Clamp;
+		t.Apply(false, false);
+		Object.DontDestroyOnLoad(t);
+		_solid[key] = t;
+		return t;
+	}
+
 	private static Material[] Materials(BasicVehicle v, Part p)
 	{
 		Material b = BaseMaterial(v);
@@ -270,18 +289,46 @@ internal static class Model3D
 		{
 			Material m = b != null ? new Material(b) : new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
 			Texture2D tex = _texFile.TryGetValue(p.Mats[i], out string tf) ? Tex(tf) : null;
-			Color c = tex != null ? Color.white : (_colors.TryGetValue(p.Mats[i], out Color cc) ? cc : Color.gray);
-			foreach (string prop in new[] { "_BaseColor", "_Color", "_MainColor", "_Tint" })
-				if (m.HasProperty(prop)) m.SetColor(prop, c);
-			foreach (string prop in new[] { "_PaintTex", "_PaintLayerTex", "_DetailTex" })
-				if (m.HasProperty(prop)) m.SetTexture(prop, Texture2D.whiteTexture);
-			foreach (string prop in new[] { "_BaseMap", "_MainTex" })
-				if (m.HasProperty(prop))
+			Color c = _colors.TryGetValue(p.Mats[i], out Color cc) ? cc : Color.gray;
+			// the car shader (VehicleUnlit) samples the car's own colour atlas with the
+			// mesh UVs, so every texture slot gets our paint (or a solid colour) and
+			// every colour slot goes white, whatever the shader calls them
+			Texture2D paint = tex != null ? tex : Solid(c);
+			var log = new System.Text.StringBuilder();
+			try
+			{
+				Shader sh = m.shader;
+				int n = sh.GetPropertyCount();
+				for (int k = 0; k < n; k++)
 				{
-					m.SetTexture(prop, tex != null ? tex : Texture2D.whiteTexture);
-					m.SetTextureScale(prop, Vector2.one);
-					m.SetTextureOffset(prop, Vector2.zero);
+					string prop = sh.GetPropertyName(k);
+					ShaderPropertyType ty = sh.GetPropertyType(k);
+					log.Append(prop).Append(':').Append(ty).Append(' ');
+					if (ty == ShaderPropertyType.Texture)
+					{
+						Texture cur = m.GetTexture(prop);
+						if (cur != null) log.Append("(was ").Append(cur.name).Append(") ");
+						m.SetTexture(prop, paint);
+						m.SetTextureScale(prop, Vector2.one);
+						m.SetTextureOffset(prop, Vector2.zero);
+					}
+					else if (ty == ShaderPropertyType.Color)
+					{
+						log.Append("(was ").Append(m.GetColor(prop)).Append(") ");
+						m.SetColor(prop, Color.white);
+					}
 				}
+			}
+			catch (Exception e)
+			{
+				log.Append("property scan failed: ").Append(e.Message);
+				foreach (string prop in new[] { "_BaseColor", "_Color", "_MainColor", "_Tint" })
+					if (m.HasProperty(prop)) m.SetColor(prop, Color.white);
+				foreach (string prop in new[] { "_BaseMap", "_MainTex" })
+					if (m.HasProperty(prop)) m.SetTexture(prop, paint);
+			}
+			try { m.mainTexture = paint; } catch { }
+			if (!_propsLogged) { _propsLogged = true; TLog.Info("3D model shader '" + m.shader.name + "' properties: " + log); }
 			m.name = "zt_" + p.Mats[i];
 			list[i] = m;
 		}

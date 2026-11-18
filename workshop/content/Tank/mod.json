@@ -1,6 +1,6 @@
 {
     "name": "Tank",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "author": "girthy_mods",
     "description": "A drivable main battle tank. The turret follows your mouse: left click fires 105 mm shells from the main gun, right click fires the roof machine gun. Runs on gasoline like the game's cars. Build a Tank Kit at a workbench, carry it and press Page Up to have the tank assembled.",
     "enabled": true
