@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.2
+
+- Battle Tank: parts no longer look pale or see-through. The camo was also going into the car shader's spray-paint layer, which is drawn on top of the paint; that layer is now left empty, and Unity's lightmap slots are left alone.
+
 ## 1.4.1
 
 - Battle Tank paint fix: the car shader was still drawing the base car's own colour sheet over the Desert Sentinel, which made it look patchy red, white and blue. Every texture slot of the shader now gets the tank's baked camo (or a solid colour for plain parts).

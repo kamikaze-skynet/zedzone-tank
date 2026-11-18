@@ -304,7 +304,13 @@ internal static class Model3D
 					string prop = sh.GetPropertyName(k);
 					ShaderPropertyType ty = sh.GetPropertyType(k);
 					log.Append(prop).Append(':').Append(ty).Append(' ');
-					if (ty == ShaderPropertyType.Texture)
+					if (ty == ShaderPropertyType.Texture && (prop.StartsWith("unity_") || prop.IndexOf("Spray", StringComparison.OrdinalIgnoreCase) >= 0))
+					{
+						// lightmaps belong to Unity, and the spray-paint layer is drawn on
+						// top of the paint (our camo there made parts pale and see-through)
+						if (prop.IndexOf("Spray", StringComparison.OrdinalIgnoreCase) >= 0) m.SetTexture(prop, null);
+					}
+					else if (ty == ShaderPropertyType.Texture)
 					{
 						Texture cur = m.GetTexture(prop);
 						if (cur != null) log.Append("(was ").Append(cur.name).Append(") ");
