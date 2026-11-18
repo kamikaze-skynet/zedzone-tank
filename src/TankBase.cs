@@ -124,10 +124,12 @@ internal static class TankBase
 		catch (Exception e) { if (!_grassWarned) { _grassWarned = true; TLog.Warn("Tank base grass: " + e.Message); } }
 	}
 
-	private static int _bigLog;
 
 	// Like any other vehicle the tank pushes the grass down rather than cutting it, but over a
 	// bigger area: one extra presser over the tank's middle, sized from the hull length.
+	private static float _maxR = -1f;
+	private static int _probeLog;
+
 	private static void BigPress(BasicVehicle v, CapsuleCollider2D col, Orig o)
 	{
 		float k = TankPlugin.BaseGrassPress.Value;
@@ -137,24 +139,43 @@ internal static class TankBase
 			TerrainGrassController g = TerrainGrassController.instance;
 			if (g == null) return;
 			Transform t = col.transform;
-			float len = Mathf.Max(o.SetSize.x, o.SetSize.y);
 			Vector3 ls = t.lossyScale;
-			float r = len * 0.5f * k * Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.y));
-			Vector3 w = t.TransformPoint((Vector3)col.offset);
-			w.z = 0f;
+			float sc = Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.y));
+			float len = Mathf.Max(o.SetSize.x, o.SetSize.y) * sc;
+			float R = len * 0.5f * k;                                   // area to clear around the middle
+			float down = len * Mathf.Max(0f, TankPlugin.BaseGrassSouth.Value); // extra reach below it
+			Vector3 c = t.TransformPoint((Vector3)col.offset);
+			c.z = 0f;
+			// only near the player: the game refuses pressers far from them
+			Camera cam = Camera.main;
+			if (cam != null && ((Vector2)(cam.transform.position - c)).sqrMagnitude > 60f * 60f) return;
 			int before = g.framePresserCount;
-			bool ok = g.PressGrass(w, r, 1f);
-			// Grass blades stand up the screen, so the ones below the tank are the ones that
-			// reach over it: a second circle further down covers them.
-			float south = TankPlugin.BaseGrassSouth.Value;
-			if (south > 0f) ok &= g.PressGrass(w + new Vector3(0f, -len * south * Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.y)), 0f), r, 1f);
-			if (_bigLog < 3 || (!ok && _bigLog < 6))
+			int cap = 16;
+			try { if (g.framePressers != null) cap = g.framePressers.Length; } catch { }
+			int free = cap - before - 2;    // leave a couple for people and zombies
+			if (free <= 0) return;
+			// largest circle the game accepts, found once
+			if (_maxR < 0f)
 			{
-				_bigLog++;
-				int cap = -1;
-				try { cap = g.framePressers != null ? g.framePressers.Length : -1; } catch { }
-				TLog.Info($"Tank grass press at {w} radius {r:0.##}: {(ok ? "ok" : "refused")}, pressers this frame {before} of {cap}");
+				float r = R;
+				while (r > 0.6f && !g.PressGrass(c, r, 1f)) r *= 0.75f;
+				_maxR = r > 0.6f ? r : 0f;
+				if (_probeLog++ < 3) TLog.Info($"Tank grass press: biggest circle the game takes is {(_maxR > 0f ? _maxR.ToString("0.##") : "none")} (wanted {R:0.##}), pressers {before} of {cap}");
+				if (_maxR <= 0f) { _maxR = -1f; return; }
+				free--;
 			}
+			float rr = Mathf.Min(_maxR, R);
+			// tile the area (circle of R around the middle, stretched down by 'down') with circles of rr
+			float step = rr * 1.35f;
+			int n = 0;
+			for (float y = R; y >= -R - down - 1e-3f && n < free; y -= step)
+				for (float x = -R; x <= R + 1e-3f && n < free; x += step)
+				{
+					float yy = y > 0f ? y : (y < -down ? y + down : 0f);
+					if (x * x + yy * yy > (R + rr * 0.5f) * (R + rr * 0.5f)) continue;
+					if (g.PressGrass(c + new Vector3(x, y, 0f), rr, 1f)) n++;
+				}
+			if (_probeLog < 6 && n > 0) { _probeLog++; TLog.Info($"Tank grass press: {n} circles of {rr:0.##} over radius {R:0.##} + {down:0.##} down"); }
 		}
 		catch (Exception e) { if (!_grassWarned) { _grassWarned = true; TLog.Warn("Tank grass press: " + e.Message); } }
 	}

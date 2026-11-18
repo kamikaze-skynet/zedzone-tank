@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.7
+
+- Grass push actually covers the Battle Tank: the game refused one big grass circle, so the area (GrassPushRadius around the middle, stretched GrassPushDown below it) is now tiled with the biggest circle the game accepts, using the free grass-presser slots. Tank.log reports the circle size and count.
+
 ## 1.5.6
 
 - Bigger grass push around the Battle Tank: radius 2x half the hull (BattleTankBase.GrassPushRadius, replaces GrassPushSize), plus a second circle below the tank (GrassPushDown 0.6), since grass below it grows up the screen over the hull.
