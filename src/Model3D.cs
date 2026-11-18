@@ -45,6 +45,8 @@ internal static class Model3D
 		public bool Failed;
 		public float NextHide;
 		public RenderTexture Pic;
+		public MeshRenderer Copy;
+		public bool CopyFailed;
 		public float NearSet = float.NaN;
 		public float NextDiag = -1f;
 		public int Diags;
@@ -629,6 +631,7 @@ internal static class Model3D
 		if (_st.TryGetValue(v, out State s))
 		{
 			try { if (s.Pivot != null) Object.Destroy(s.Pivot); } catch { }
+			try { if (s.Copy != null) Object.Destroy(s.Copy.gameObject); } catch { }
 			_st.Remove(v);
 		}
 	}
@@ -684,6 +687,43 @@ internal static class Model3D
 		else if (gl == pl) ord = Mathf.Max(ord, _grassOrder + 1);
 	}
 
+	// The game's car picture lives under VehicleParent on the Vehicle layer, and grass still
+	// covered it whatever its sorting, queue or depth. The classic tank's sprites are free objects
+	// on the Default layer and are never covered, so show the picture the same way: our own copy
+	// of the quad, outside VehicleParent, and the game's quad switched off.
+	private static void OwnQuad(BasicVehicle v, State s, Renderer qr, int sl, int ord)
+	{
+		try
+		{
+			if (s.Copy == null)
+			{
+				MeshFilter qf = qr.GetComponent<MeshFilter>();
+				if (qf == null || qf.sharedMesh == null) return;
+				var go = new GameObject("zt_tank_picture_quad");
+				go.layer = 0;
+				go.AddComponent<MeshFilter>().sharedMesh = qf.sharedMesh;
+				s.Copy = go.AddComponent<MeshRenderer>();
+				s.Copy.sharedMaterial = qr.sharedMaterial;
+				s.Copy.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+				s.Copy.receiveShadows = false;
+				TLog.Info($"Tank picture: own quad on layer 0 (game quad parent '{(qr.transform.parent != null ? qr.transform.parent.name : "-")}')");
+			}
+			Transform t = s.Copy.transform, q = qr.transform;
+			float lift = TankPlugin.Model3DLift.Value;
+			Vector3 p = q.position;
+			t.position = new Vector3(p.x, p.y, v.transform.position.z - lift);
+			t.rotation = q.rotation;
+			t.localScale = q.lossyScale;
+			if (s.Copy.sharedMaterial == null || s.Copy.sharedMaterial.Pointer != qr.sharedMaterial.Pointer) s.Copy.sharedMaterial = qr.sharedMaterial;
+			if (s.Copy.sortingLayerID != sl) s.Copy.sortingLayerID = sl;
+			if (s.Copy.sortingOrder != ord) s.Copy.sortingOrder = ord;
+			bool show = qr.enabled && q.gameObject.activeInHierarchy && !v.layerHiddenFlag;
+			if (s.Copy.enabled != show) s.Copy.enabled = show;
+			if (!qr.forceRenderingOff) qr.forceRenderingOff = true;
+		}
+		catch (Exception e) { if (!s.CopyFailed) { s.CopyFailed = true; TLog.Warn("tank picture quad: " + e.Message); } }
+	}
+
 	// lowest layer the car camera films
 	private static int CamLayer(Camera c)
 	{
@@ -730,29 +770,7 @@ internal static class Model3D
 				{
 					int sl = Tank.SortLayer, ord = TankPlugin.SortingOrder.Value;
 					GrassSort(ref sl, ref ord);
-					if (qr.sortingLayerID != sl) qr.sortingLayerID = sl;
-					if (qr.sortingOrder != ord) qr.sortingOrder = ord;
-					// Lift the flat picture toward the camera so tall grass can't hide it by depth.
-					float lift = TankPlugin.Model3DLift.Value;
-					Camera mc = Camera.main;
-					if (lift > 0f && mc != null && mc.orthographic)
-					{
-						Vector3 qp = qr.transform.position;
-						float wantZ = v.transform.position.z - lift;
-						if (Mathf.Abs(qp.z - wantZ) > 0.01f) qr.transform.position = new Vector3(qp.x, qp.y, wantZ);
-					}
-					// The render queue wins over sorting layers: if grass draws in a later queue,
-					// draw the tank picture in a queue after it.
-					Material qm = qr.sharedMaterial;
-					if (qm != null && _grassQueue >= 0)
-					{
-						int wq = Mathf.Max(_grassQueue + 1, 3000);
-						if (qm.renderQueue < wq)
-						{
-							TLog.Info($"Tank picture queue {qm.renderQueue} -> {wq} (grass queue {_grassQueue})");
-							qm.renderQueue = wq;
-						}
-					}
+					OwnQuad(v, s, qr, sl, ord);
 				}
 			}
 			int want = TankPlugin.Model3DPictureSize.Value;

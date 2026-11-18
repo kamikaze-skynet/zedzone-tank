@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.12
+
+- Battle Tank picture is shown on its own quad like the classic tank's sprites (Default layer, outside the game's VehicleParent), and the game's car quad is switched off. 1.5.11's log showed the picture was fully solid, lifted above the grass and sorted after it, yet still covered, so the game's car quad itself is what grass draws over.
+
 ## 1.5.11
 
 - Battle Tank picture is lifted toward the camera (BattleTank.PictureLift, 4) so tall grass can't hide it by depth. The grass was already drawn before the tank in 1.5.10, so the cover wasn't a draw-order problem.
