@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.6
+
+- Battle Tank see-through fix: the 3D tank was on the map's Vehicle layer, so the main camera drew it straight onto the map (unsorted, see-through, pale) instead of the car camera filming it into the car's picture like every other car. It now goes on the car camera's own layer (VehicleModel).
+- The car camera may now clip up to 12 m behind itself (BattleTank.CameraNearClip), so the turret and gun are no longer cut off when they swing toward it.
+- The car's picture is 768 px instead of 256 (BattleTank.PictureSize) so the zoomed-out tank stays sharp.
+
 ## 1.4.5
 
 - Draw diagnostics for the Battle Tank (config Debug.DrawDiagnostics, on by default). A few times after the tank appears, Tank.log gets a 'Draw check' block: the car camera (clear mode, background, layers, clip range, render target format), whether the tank sits inside the camera's clip range, the quad that shows the car on the map with all its material settings, every renderer on the car, and all cameras.

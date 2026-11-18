@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.4.5";
+	public const string Version = "1.4.6";
 
 	internal static ManualLogSource L;
 
@@ -34,6 +34,8 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<float> Model3DSize;
 	internal static ConfigEntry<float> Model3DZoom;
 	internal static ConfigEntry<bool> DrawDiagnostics;
+	internal static ConfigEntry<int> Model3DPictureSize;
+	internal static ConfigEntry<float> Model3DNearClip;
 	internal static ConfigEntry<bool> Model3DFlip;
 	internal static ConfigEntry<string> MgSoundWeapon;
 	internal static ConfigEntry<float> CrewSafeRadius;
@@ -60,6 +62,8 @@ public class TankPlugin : BasePlugin
 		TankScale = Config.Bind("Look", "Scale", 1.1f, new ConfigDescription("Size of the tank's art.", new AcceptableValueRange<float>(0.5f, 3f)));
 		Model3DSize = Config.Bind("BattleTank", "Size", 1.25f, "Battle Tank (3D model) hull length compared with the base car's length.");
 		Model3DZoom = Config.Bind("BattleTank", "CameraZoomOut", 2.2f, "How far the car camera zooms out for the Battle Tank so its long gun isn't cut off (the picture is enlarged by the same amount, so the tank keeps its size).");
+		Model3DPictureSize = Config.Bind("BattleTank", "PictureSize", 768, "Pixel size of the picture the car camera films the Battle Tank into (the game uses 256 for cars; the tank is zoomed out, so it needs more to stay sharp). 0 keeps the game's picture.");
+		Model3DNearClip = Config.Bind("BattleTank", "CameraNearClip", 12f, "How far in front of the car camera the Battle Tank may reach before it is cut off (the camera is orthographic, so this can reach behind it).");
 		DrawDiagnostics = Config.Bind("Debug", "DrawDiagnostics", true, "Write how the Battle Tank is drawn (car camera, its picture, the quad on the map, every renderer) to Tank.log a few times after it appears.");
 		Model3DFlip = Config.Bind("BattleTank", "FlipModel", false, "Turn the 3D model around if it drives backwards.");
 		SortingOrder = Config.Bind("Look", "SortingOrder", 32000, "Draw order of the tank's art (higher draws on top of more things).");

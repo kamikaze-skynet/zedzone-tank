@@ -44,6 +44,8 @@ internal static class Model3D
 		public float YawSign = -1f;
 		public bool Failed;
 		public float NextHide;
+		public RenderTexture Pic;
+		public float NearSet = float.NaN;
 		public float NextDiag = -1f;
 		public int Diags;
 		public readonly List<Renderer> Hidden = new List<Renderer>();
@@ -454,6 +456,10 @@ internal static class Model3D
 			float scale = carLen * TankPlugin.Model3DSize.Value / HullLength;
 			int layer = 0;
 			try { layer = v.vehicleMeshRenderer != null ? v.vehicleMeshRenderer.gameObject.layer : parent.gameObject.layer; } catch { }
+			// The car camera only films its own layer (VehicleModel) into the car's picture. On any
+			// other layer the main camera draws the tank straight onto the map, unsorted and see-through.
+			int camLayer = CamLayer(s.Cam);
+			if (camLayer >= 0) layer = camLayer;
 
 			s.Pivot = new GameObject("zt_tank3d");
 			s.Pivot.layer = layer;
@@ -529,6 +535,7 @@ internal static class Model3D
 				s.QuadSet = true;
 			}
 		}
+		Picture(v, s, k);
 		// Which way a positive turn about the model's up axis shows on screen decides the sign.
 		if (Map(s, s.Pivot.transform.TransformPoint(Vector3.zero), out Vector2 o)
 			&& Map(s, s.Pivot.transform.TransformPoint(Vector3.forward), out Vector2 fz)
@@ -611,6 +618,67 @@ internal static class Model3D
 			try { if (s.Pivot != null) Object.Destroy(s.Pivot); } catch { }
 			_st.Remove(v);
 		}
+	}
+
+
+	// lowest layer the car camera films
+	private static int CamLayer(Camera c)
+	{
+		if (c == null) return -1;
+		int m = c.cullingMask;
+		if (m == 0 || m == -1) return -1;
+		for (int i = 0; i < 32; i++) if (((m >> i) & 1) == 1) return i;
+		return -1;
+	}
+
+	private static void SetLayer(GameObject go, int layer)
+	{
+		if (go == null || go.layer == layer) return;
+		go.layer = layer;
+	}
+
+	/// <summary>Keeps the tank in the car camera's picture: on the camera's layer, inside its clip
+	/// range (an orthographic camera may clip from behind itself), and at a picture size that
+	/// keeps the zoomed-out tank sharp.</summary>
+	private static void Picture(BasicVehicle v, State s, float k)
+	{
+		Camera c = s.Cam;
+		if (c == null) return;
+		try
+		{
+			int layer = CamLayer(c);
+			if (layer >= 0)
+			{
+				SetLayer(s.Pivot, layer);
+				SetLayer(s.Hull, layer);
+				SetLayer(s.Turret, layer);
+			}
+			// the turret and gun swing past the camera's near plane at 0.3
+			float near = -TankPlugin.Model3DNearClip.Value;
+			if (c.orthographic && c.nearClipPlane > near) c.nearClipPlane = near;
+
+			int want = TankPlugin.Model3DPictureSize.Value;
+			RenderTexture cur = c.targetTexture;
+			if (want <= 0 || cur == null) return;
+			if (s.Pic != null && cur.Pointer == s.Pic.Pointer) return;
+			if (cur.width >= want && s.Pic == null) return;
+			if (s.Pic == null)
+			{
+				s.Pic = new RenderTexture(want, want, cur.depth, cur.format);
+				s.Pic.name = "zt_tank_picture";
+				s.Pic.filterMode = cur.filterMode;
+				s.Pic.antiAliasing = 1;
+				s.Pic.Create();
+				Object.DontDestroyOnLoad(s.Pic);
+				TLog.Info($"3D tank picture: {cur.width}x{cur.height} {cur.format} -> {want}x{want} (camera zoom x{k:0.##})");
+			}
+			c.targetTexture = s.Pic;
+			Renderer q = v.vehicleQuadRenderer;
+			if (q != null)
+				foreach (Material m in q.sharedMaterials)
+					if (m != null && m.HasProperty("_MainTex")) m.SetTexture("_MainTex", s.Pic);
+		}
+		catch (Exception e) { TLog.Warn("3D tank picture: " + e.Message); }
 	}
 
 	// ------------------------------------------------------------------ draw diagnostics
