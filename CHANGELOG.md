@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.2
+
+- Real tank recordings replace the made-up sounds: a Leopard 2A7 engine start-up when the engine is turned on, its idle, and a tank moving loop (engine and tracks) while driving. The game fades and pitches them like any car engine. The made-up sound styles and the separate track loop are gone (Effects.TankSoundStyle, Effects.TrackVolume removed).
+
 ## 1.6.1
 
 - New tank sounds: engine idle, engine and track loops are made offline by art-src/tank_sounds.py (V12 diesel firing pulses through exhaust resonances, link clanks, road-wheel rumble and track squeal) and embedded in the DLL. Three styles: diesel, heavy_diesel, turbine (Effects.TankSoundStyle).
