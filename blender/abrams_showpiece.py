@@ -655,9 +655,55 @@ for s in (-1, 1):
         hinge("Paint3", (xc - 0.3, yo, zt + 0.02), (xc - 0.05, yo, zt + 0.02), 0.025, 2)
         hinge("Paint3", (xc + 0.05, yo, zt + 0.02), (xc + 0.3, yo, zt + 0.02), 0.025, 2)
         box("Rubber", (0.88, 0.025, 0.08), (xc, yo, zb - 0.03), w=0.006)
+        if i == 0:
+            box("Dark", (0.26, 0.03, 0.12), (xc - 0.05, face, 1.0), w=0.01)
+            box("Paint3", (0.24, 0.05, 0.02), (xc - 0.05, face, 0.95), w=0.004)
+            handle("Paint3", (xc + 0.2, face, 1.45), (xc + 0.2, face, 1.2), (0, s * 0.06, 0))
         for bx in (-0.35, 0.0, 0.35):
             bolt((xc + bx, yo + s * 0.013, zb - 0.02), so, 0.01, 0.014)
     box("Paint2", (7.7, 0.27, 0.045), (-0.1, s * (W / 2 - 0.12), DECK - 0.07), w=0.012)
+
+# ================================================================== FRONT EXTRAS
+part("Hull", "hull")
+for s in (-1, 1):
+    # spare track links on the glacis, held by a retaining bar and two J-bolts
+    for k in range(4):
+        put(G_link(TW), gl(2.92 + k * 0.165, s * 1.36, 0.095) @ xf(rot=(0, 0, 0)))
+    M = gl(3.17, s * 1.36, 0.0)
+    for e in (-0.27, 0.27):
+        box("Paint3", (0.06, 0.05, 0.24), (0, e, 0.12), w=0.008, M=M)
+        rod("Paint3", (-0.36, e, 0.22), (0.36, e, 0.22), 0.016, 12, M=M)
+        bolt((0.0, e, 0.24), "z", 0.013, 0.02, M=M)
+    # headlight conduit from the cluster into the hull
+    tube("Gunmetal", [tuple(gl(3.6, s * 1.5) @ Vector(q)) for q in [(-0.12, -s * 0.12, 0.05), (-0.25, -s * 0.14, 0.02), (-0.6, -s * 0.2, 0.012)]], 0.013, 10)
+    box("Paint3", (0.07, 0.05, 0.025), (0, 0, 0.012), w=0.005, M=gl(3.3, s * 1.32))
+    # tie-down rings and reflectors on the nose
+    for y in (0.35, 0.55):
+        box("Paint3", (0.08, 0.06, 0.05), (4.09, s * y, 1.0), w=0.01)
+        torus("Paint3", 0.045, 0.012, (4.15, s * y, 0.96), (0, 0, 0), 24, 8)
+    lathe("Paint3", [(0, 0), (0.05, 0), (0.05, 0.015), (0, 0.015)], (4.07, s * 1.0, 1.0), "x", 24)
+    lathe("RedLens", [(0, 0), (0.04, 0), (0.035, 0.012), (0, 0.016)], (4.085, s * 1.0, 1.0), "x", 24)
+# bumper number plates on the nose
+for y in (-0.5, 0.5):
+    box("Paint2", (0.012, 0.42, 0.14), (4.086, y, 0.9), w=0.004)
+    for k in range(4):
+        box("Dark", (0.004, 0.05, 0.09), (4.093, y - 0.12 + k * 0.08, 0.9))
+# tow cable stowed across the glacis in four clamps, eyes looped over pins
+M = gl(3.45, 0, 0.0)
+cpts = [(0.0, -1.05, 0.035)] + [(0.015 * math.sin(k * 1.3), -0.95 + k * 0.19, 0.045) for k in range(11)] + [(0.0, 1.05, 0.035)]
+tube("Track", cpts, 0.028, 14, M=M)
+for e in (-1, 1):
+    torus("Track", 0.07, 0.018, (0.0, e * 1.12, 0.04), (0, 0, 0), 24, 8, M=M)
+    lathe("Paint3", [(0, 0), (0.025, 0), (0.025, 0.08), (0.035, 0.09), (0, 0.1)], (0.0, e * 1.12, 0.0), M=M, n=16)
+for y in (-0.7, -0.25, 0.25, 0.7):
+    box("Paint3", (0.08, 0.05, 0.02), (0, y, 0.01), w=0.004, M=M)
+    tube("Paint3", [(-0.03, y - 0.04, 0.0), (-0.03, y - 0.04, 0.06), (-0.03, y + 0.04, 0.06), (-0.03, y + 0.04, 0.0)], 0.008, 8, M=M)
+    rod("Paint3", (-0.03, y, 0.06), (0.04, y, 0.06), 0.008, 8, M=M)
+# turret ring splash guard in front of the turret
+for k in range(9):
+    a = -0.9 + k * 0.225
+    box("Paint2", (0.05, 0.36, 0.12), (GX + math.cos(a) * 1.55, math.sin(a) * 1.55, DECK + 0.06), (0, 0, a), w=0.012)
+    bolt((GX + math.cos(a) * 1.58, math.sin(a) * 1.58, DECK + 0.1), (0, RY, a), 0.011, 0.014)
 
 # ================================================================== TURRET (origin = ring centre on the deck)
 part("Turret", "turret")
@@ -900,6 +946,20 @@ for x in (2.9, 4.6, 5.05, 5.5, 6.0, 6.5, 7.0):
     box("Paint3", (0.035, 0.05, 0.035), (x, 0, 0.42 + r0 + 0.025), w=0.006)
     rod("Paint3", (x, -0.03, 0.42 + r0 + 0.03), (x, 0.03, 0.42 + r0 + 0.03), 0.007, 8)
 # muzzle reference sensor: clamp band, mount and mirror box
+for k in range(9):
+    rz = 0.012 * math.sin(k * 1.7)
+    box("Canvas", (0.07, 0.86, 0.05), (1.82 + k * 0.058, 0, 0.75 + rz), (0.02 * math.sin(k), 0.25 * math.sin(k * 2.1), 0), w=0.02, seg=3)
+for e in (-1, 1):
+    for k in range(6):
+        box("Canvas", (0.5, 0.03, 0.1), (2.08, e * 0.418, 0.15 + k * 0.1), (0.15 * math.sin(k * 2.0), 0, 0), w=0.012, seg=2)
+    rod("Paint3", (4.25, e * 0.1, 0.42 + 0.1), (7.4, e * 0.095, 0.42 + 0.096), 0.006, 8)
+rod("Paint3", (4.25, 0, 0.42 + 0.143), (7.4, 0, 0.42 + 0.134), 0.006, 8)
+for x in (4.8, 5.3, 6.25, 6.75):
+    lathe("Strap", [(0.13, x - 0.02), (0.15, x - 0.02), (0.15, x + 0.02), (0.13, x + 0.02)], (0, 0, 0.42), (0, RY, 0), 96, closed=True)
+    box("Gunmetal", (0.05, 0.04, 0.02), (x, 0.0, 0.42 - 0.15), w=0.004)
+# gunner's auxiliary sight armoured flap
+box("Paint2", (0.02, 0.14, 0.14), (2.45, -0.27, 0.71), (0, -0.9, 0), w=0.006)
+hinge("Paint3", (2.4, -0.33, 0.69), (2.4, -0.21, 0.69), 0.012, 2)
 lathe("Paint3", [(0.13, 7.44), (0.158, 7.44), (0.162, 7.46), (0.162, 7.56), (0.158, 7.58), (0.13, 7.58)], (0, 0, 0.42), (0, RY, 0), 96, closed=True)
 box("Paint3", (0.12, 0.1, 0.07), (7.51, 0, 0.42 + 0.19), w=0.012)
 box("Paint2", (0.2, 0.16, 0.13), (7.5, 0, 0.42 + 0.29), w=0.018)
