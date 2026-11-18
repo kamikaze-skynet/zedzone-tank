@@ -732,6 +732,15 @@ internal static class Model3D
 					GrassSort(ref sl, ref ord);
 					if (qr.sortingLayerID != sl) qr.sortingLayerID = sl;
 					if (qr.sortingOrder != ord) qr.sortingOrder = ord;
+					// Lift the flat picture toward the camera so tall grass can't hide it by depth.
+					float lift = TankPlugin.Model3DLift.Value;
+					Camera mc = Camera.main;
+					if (lift > 0f && mc != null && mc.orthographic)
+					{
+						Vector3 qp = qr.transform.position;
+						float wantZ = v.transform.position.z - lift;
+						if (Mathf.Abs(qp.z - wantZ) > 0.01f) qr.transform.position = new Vector3(qp.x, qp.y, wantZ);
+					}
 					// The render queue wins over sorting layers: if grass draws in a later queue,
 					// draw the tank picture in a queue after it.
 					Material qm = qr.sharedMaterial;
@@ -820,6 +829,59 @@ internal static class Model3D
 
 	/// <summary>Logs how the car is drawn: its camera, the picture it renders into, the quad that
 	/// shows that picture on the map, and every renderer on the car. For see-through problems.</summary>
+	// How solid the tank picture is: grass behind a see-through picture looks like grass on top.
+	private static string AlphaStats(RenderTexture rt)
+	{
+		if (rt == null) return "";
+		try
+		{
+			RenderTexture old = RenderTexture.active;
+			RenderTexture.active = rt;
+			var t = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false);
+			t.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+			t.Apply();
+			RenderTexture.active = old;
+			var px = t.GetPixels32();
+			int[] h = new int[5]; int any = 0;
+			for (int i = 0; i < px.Length; i += 3)
+			{
+				byte a = px[i].a;
+				if (a < 3) continue;
+				any++;
+				h[a >= 250 ? 4 : a >= 192 ? 3 : a >= 128 ? 2 : a >= 64 ? 1 : 0]++;
+			}
+			Object.Destroy(t);
+			if (any == 0) return "\n    picture alpha: empty";
+			return $"\n    picture alpha (tank pixels {any}): <25% {h[0] * 100 / any}%, 25-50% {h[1] * 100 / any}%, 50-75% {h[2] * 100 / any}%, 75-98% {h[3] * 100 / any}%, solid {h[4] * 100 / any}%";
+		}
+		catch (Exception e) { return "\n    picture alpha: " + e.Message; }
+	}
+
+	// Depth: tall grass may write depth above the ground and hide the flat car picture behind it.
+	private static string DepthInfo(BasicVehicle v)
+	{
+		var b = new System.Text.StringBuilder();
+		try
+		{
+			Camera m = Camera.main;
+			if (m != null) b.Append($"\n    main camera ortho {m.orthographic} z {m.transform.position.z:0.##} fwd {m.transform.forward} near {m.nearClipPlane:0.##} far {m.farClipPlane:0.##}");
+			Renderer q = v.vehicleQuadRenderer;
+			if (q != null) b.Append($"\n    quad z {q.transform.position.z:0.##} (lift {TankPlugin.Model3DLift.Value})");
+			var cells = TerrainGrassController.instance?.frontActiveCells;
+			if (cells != null && cells.Count > 0 && cells[0] != null)
+				foreach (Renderer r in new Renderer[] { cells[0].frontRenderer, cells[0].backRenderer })
+				{
+					if (r == null) continue;
+					Material mt = r.sharedMaterial;
+					b.Append($"\n    grass {r.name} z {r.bounds.min.z:0.##}..{r.bounds.max.z:0.##} shader '{(mt != null ? mt.shader.name : "?")}'");
+					if (mt != null) foreach (string pn in new[] { "_ZWrite", "_ZTest", "_Cull", "_Surface", "_AlphaClip", "_Cutoff" })
+						if (mt.HasProperty(pn)) b.Append($" {pn} {mt.GetFloat(pn)}");
+				}
+		}
+		catch (Exception e) { b.Append("\n    depth info: " + e.Message); }
+		return b.ToString();
+	}
+
 	private static void Diag(BasicVehicle v, State s, int n)
 	{
 		var b = new System.Text.StringBuilder();
@@ -837,6 +899,8 @@ internal static class Model3D
 				RenderTexture rt = c.targetTexture;
 				if (rt == null) b.Append("\n    target: screen");
 				else b.Append($"\n    target '{rt.name}' {rt.width}x{rt.height} fmt {rt.format} depth {rt.depth} aa {rt.antiAliasing} sRGB {rt.sRGB}");
+				b.Append(AlphaStats(s.Pic));
+				b.Append(DepthInfo(v));
 				foreach (Renderer r in new[] { s.Hull != null ? s.Hull.GetComponent<Renderer>() : null, s.Turret != null ? s.Turret.GetComponent<Renderer>() : null })
 				{
 					if (r == null) continue;

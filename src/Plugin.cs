@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.5.10";
+	public const string Version = "1.5.11";
 
 	internal static ManualLogSource L;
 
@@ -39,6 +39,7 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<int> Model3DPictureSize;
 	internal static ConfigEntry<bool> Model3DOnTop;
 	internal static ConfigEntry<float> Model3DNearClip;
+	internal static ConfigEntry<float> Model3DLift;
 	internal static ConfigEntry<bool> Model3DFlip;
 	internal static ConfigEntry<string> MgSoundWeapon;
 	internal static ConfigEntry<float> CrewSafeRadius;
@@ -67,6 +68,7 @@ public class TankPlugin : BasePlugin
 		Model3DZoom = Config.Bind("BattleTank", "CameraZoomOut", 2.2f, "How far the car camera zooms out for the Battle Tank so its long gun isn't cut off (the picture is enlarged by the same amount, so the tank keeps its size).");
 		Model3DOnTop = Config.Bind("BattleTank", "DrawOnTop", true, "Draw the Battle Tank on top of grass and bushes like the classic tank (Look.SortingOrder). Off: sorted in with the grass like the game's cars.");
 		Model3DPictureSize = Config.Bind("BattleTank", "PictureSize", 768, "Pixel size of the picture the car camera films the Battle Tank into (the game uses 256 for cars; the tank is zoomed out, so it needs more to stay sharp). 0 keeps the game's picture.");
+		Model3DLift = Config.Bind("BattleTank", "PictureLift", 4f, "Raise the Battle Tank's flat picture this far toward the camera so tall grass can't hide it (0 = off).");
 		Model3DNearClip = Config.Bind("BattleTank", "CameraNearClip", 12f, "How far in front of the car camera the Battle Tank may reach before it is cut off (the camera is orthographic, so this can reach behind it).");
 		DrawDiagnostics = Config.Bind("Debug", "DrawDiagnostics", true, "Write how the Battle Tank is drawn (car camera, its picture, the quad on the map, every renderer) to Tank.log a few times after it appears.");
 		BaseEnabled = Config.Bind("BattleTankBase", "Enabled", true, "Make the pickup under a Battle Tank into a tank of its own: hit box the size of the tank, heavier, more armour, tank handling.");

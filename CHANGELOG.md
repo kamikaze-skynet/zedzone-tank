@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.11
+
+- Battle Tank picture is lifted toward the camera (BattleTank.PictureLift, 4) so tall grass can't hide it by depth. The grass was already drawn before the tank in 1.5.10, so the cover wasn't a draw-order problem.
+- Draw check now logs how solid the tank picture is (alpha), the main camera and quad depth, and the grass shader settings.
+
 ## 1.5.10
 
 - Battle Tank picture is placed above the tall grass meshes themselves: it reads the grass cells' sorting layer, order and render queue and draws after them (the render queue wins over sorting layers, which is why 1.5.9 didn't help). Logs "Grass draw order:" once.
