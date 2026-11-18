@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.5
+
+- Battle Tank is bigger: default size 1.6x the base car's length (was 1.25), with the car camera zoomed out to 2.8 and a 1024 px picture so it still fits and stays sharp. The hit box grows with it. Existing configs keep their own BattleTank.Size, CameraZoomOut and PictureSize.
+
 ## 1.5.4
 
 - Machine gun sound keeps up with a held trigger: every round now plays its own overlapping copy of the clip through a game audio source (the game's PlayAt skipped a clip that was still sounding, so only the odd shot was heard).
