@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.6.4";
+	public const string Version = "1.7.0";
 
 	internal static ManualLogSource L;
 
@@ -32,6 +32,7 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<bool> RequireKit;
 	internal static ConfigEntry<bool> HideClassic;
 	internal static ConfigEntry<bool> TankSounds;
+	internal static ConfigEntry<bool> BuildMenuTab;
 	internal static ConfigEntry<bool> CrewSafe;
 	internal static ConfigEntry<float> Model3DSize;
 	internal static ConfigEntry<float> Model3DZoom;
@@ -92,6 +93,7 @@ public class TankPlugin : BasePlugin
 		ReloadSeconds = Config.Bind("MainGun", "ReloadSeconds", 2.5f, "Seconds between main gun shots.");
 		RocketsNeedAmmo = Config.Bind("MainGun", "UseAmmo", true, "Each shot uses one 105 mm Tank Shell from the tank's cargo or your backpack.");
 		HideClassic = Config.Bind("General", "BattleTankOnly", true, "Only the Battle Tank: the old Tank Kit can't be crafted any more, and every call-in (also with an old Tank Kit) brings a Battle Tank. Tanks already in a save stay as they are.");
+		BuildMenuTab = Config.Bind("General", "BuildMenuTab", true, "A VEHICLES tab in the Build menu where the Battle Tank can be built from the materials you carry.");
 		TankSounds = Config.Bind("Effects", "TankSounds", true, "Real tank engine start-up, idle and moving sounds instead of the base car's engine.");
 		RequireKit = Config.Bind("General", "RequireTankKit", true, "Page Up only calls in a tank when you carry a Tank Kit (built at a workbench), and uses the kit up. Off = free call-ins, limited by MaxTanks.");
 		CrewSafe = Config.Bind("Armor", "CrewSafeFromOwnShells", true, "The tank's own shells can't hurt anyone inside a tank (driver and riders).");
@@ -127,7 +129,7 @@ public class TankPlugin : BasePlugin
 		if (_patched) return;
 		_patched = true;
 		var h = new Harmony(Guid);
-		Type[] types = { typeof(P_MouseDown), typeof(P_MouseHold), typeof(P_Name1), typeof(P_Name2), typeof(P_Name3), typeof(P_LootTitle) };
+		Type[] types = { typeof(P_MouseDown), typeof(P_MouseHold), typeof(P_Name1), typeof(P_Name2), typeof(P_Name3), typeof(P_LootTitle), typeof(P_BuildEnsure), typeof(P_BuildOpen), typeof(P_BuildTab), typeof(P_BuildList), typeof(P_BuildAttr), typeof(P_BuildCard), typeof(P_BuildDetails), typeof(P_BuildGo), typeof(P_BuildCardClick), typeof(P_BuildAttrName), typeof(P_BuildAttrDesc), typeof(P_BuildAttrCan) };
 		int ok = 0;
 		foreach (Type t in types)
 		{

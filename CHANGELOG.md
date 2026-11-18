@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.0
+
+- VEHICLES tab in the Build menu with the Battle Tank (General.BuildMenuTab, on). Select it and press BUILD (or double-click it) to build a Battle Tank from the materials you carry: 60 Iron Plate, 20 Metal Component, 10 Copper Tube, 20 Iron Wire, 10 Copper Wire. It rolls out a few tiles in front of you. The Battle Tank Kit still works too.
+
 ## 1.6.4
 
 - Tank start-up, idle and moving sounds are louder (about +5 dB, gently limited).

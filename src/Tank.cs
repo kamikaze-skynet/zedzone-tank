@@ -569,7 +569,7 @@ internal static partial class Tank
 		return list;
 	}
 
-	private static int Count(List<InventoryData> boxes, int id)
+	internal static int Count(List<InventoryData> boxes, int id)
 	{
 		float n = 0f;
 		foreach (InventoryData b in boxes)
