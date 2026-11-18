@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.3
+
+- Grass works like it does for any other vehicle: the Battle Tank no longer crushes grass by default (new setting BattleTankBase.TankCrushesGrass, off by default; the old CrushGrass setting is no longer read). Instead the tank's vehicle size is set to the tank's footprint, which the game uses for a car's grass pressing, path footprint and body checks.
+
 ## 1.5.2
 
 - Grass the Battle Tank crushes grows back after a reload instead of being removed from the world save. Set BattleTankBase.CrushGrassPermanent = true to keep permanent tank trails.

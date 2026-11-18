@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.5.2";
+	public const string Version = "1.5.3";
 
 	internal static ManualLogSource L;
 
@@ -72,7 +72,7 @@ public class TankPlugin : BasePlugin
 		BaseArmour = Config.Bind("BattleTankBase", "Armour", 5f, "Battle Tank bodywork health compared with the pickup.");
 		BaseTopSpeed = Config.Bind("BattleTankBase", "TopSpeed", 0.8f, "Battle Tank top speed compared with the pickup.");
 		BaseTurn = Config.Bind("BattleTankBase", "TurnRate", 1f, "Battle Tank turning speed compared with the pickup.");
-		BasePressGrass = Config.Bind("BattleTankBase", "CrushGrass", true, "The Battle Tank crushes the grass it drives over so tall grass doesn't cover it.");
+		BasePressGrass = Config.Bind("BattleTankBase", "TankCrushesGrass", false, "The Battle Tank crushes the grass it drives over so tall grass doesn't cover it.");
 		BaseGrassPermanent = Config.Bind("BattleTankBase", "CrushGrassPermanent", false, "Crushed grass stays gone in the world save (tank trails). Off: it grows back after a reload.");
 		Model3DFlip = Config.Bind("BattleTank", "FlipModel", false, "Turn the 3D model around if it drives backwards.");
 		SortingOrder = Config.Bind("Look", "SortingOrder", 32000, "Draw order of the tank's art (higher draws on top of more things).");

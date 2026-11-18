@@ -59,6 +59,8 @@ internal static class TankBase
 			}
 			CapsuleCollider2D col = v.vehicleCollider2D;
 			if (col != null && (col.size - o.SetSize).sqrMagnitude > 1e-6f) col.size = o.SetSize;
+			// the game sizes a car's grass pressing, nav footprint and body checks from vehicleSize
+			if ((v.vehicleSize - o.SetSize).sqrMagnitude > 1e-6f) v.vehicleSize = o.SetSize;
 			if (Mathf.Abs(v.vehicleMass - o.SetMass) > 0.01f) v.vehicleMass = o.SetMass;
 			if (v.m_rigidbody != null && o.RbMass > 0f)
 			{
