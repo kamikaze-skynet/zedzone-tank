@@ -60,9 +60,10 @@ internal static partial class Tank
 	private static float _callWait;
 	private static float _cannonAt;
 	private static float _mgAt;
-	// The base car's nose direction in its own space. 180 is what the pickup (the base car in
-	// this game version) uses; it's confirmed from the headlights and cached in Tank.forward.txt.
-	private static float _fwd = 180f;
+	// The base car's nose direction in its own space. It's learned from how the car actually
+	// moves while you hold W (or S) and cached in Tank.forward.txt. 0 until learned.
+	private static float _fwd = 0f;
+	private static int _fwdVotes;
 	private static bool _fwdKnown;
 	private static int _baseId = -1;
 	private static int _sortLayer;
@@ -88,9 +89,10 @@ internal static partial class Tank
 		{
 			if (_fwdKnown || !File.Exists(FwdPath)) return;
 			string[] a = File.ReadAllText(FwdPath).Trim().Split('|');
-			if (a.Length >= 2 && int.Parse(a[0], CI) == BaseId())
+			// v2 = learned from driving (older files came from the headlights and could be backwards)
+			if (a.Length >= 3 && a[0] == "v2" && int.Parse(a[1], CI) == BaseId())
 			{
-				_fwd = F(a[1]);
+				_fwd = F(a[2]);
 				_fwdKnown = true;
 				TLog.Info($"Base car nose direction {_fwd:0} (cached)");
 			}
@@ -194,7 +196,7 @@ internal static partial class Tank
 				string[] a = line.Split('|');
 				if (a[0] == "K" && a.Length >= 3) _known.Add(new Vector2(F(a[1]), F(a[2])));
 				else if (a[0] == "C" && a.Length >= 2) _called = int.Parse(a[1], CI);
-				else if (a[0] == "R" && a.Length >= 2) { _fwd = F(a[1]); _fwdKnown = true; }
+				else if (a[0] == "R2" && a.Length >= 2) { _fwd = F(a[1]); _fwdKnown = true; }
 			}
 			TLog.Info($"Save {_saveId}: {_known.Count} tank(s) on record, {_called} called in");
 		}
@@ -207,7 +209,7 @@ internal static partial class Tank
 		{
 			var sb = new StringBuilder();
 			sb.AppendLine("C|" + _called.ToString(CI));
-			if (_fwdKnown) sb.AppendLine("R|" + _fwd.ToString("0", CI));
+			if (_fwdKnown) sb.AppendLine("R2|" + _fwd.ToString("0", CI));
 			foreach (Vector2 k in _known) sb.AppendLine($"K|{k.x.ToString("0.##", CI)}|{k.y.ToString("0.##", CI)}");
 			File.WriteAllText(FilePath, sb.ToString(), new UTF8Encoding(false));
 			_dirty = false;
@@ -566,41 +568,36 @@ internal static partial class Tank
 
 	private static float Heading(BasicVehicle v) => VehAng(v) + _fwd;
 
-	// Which way the base car's nose points in its own space, from its headlights.
+	// Which way the base car's nose points in its own space: while the local driver holds W
+	// (and not S) the car rolls nose first, so its velocity shows where the nose is. S is the
+	// mirror case. A few agreeing frames in a row settle it, and it is re-checked every drive.
 	private static void FindForward(BasicVehicle v)
 	{
-		if (_fwdKnown) return;
 		try
 		{
-			Light2D l = v.headlight_Left ?? v.headlight_Right;
-			if (l != null)
-			{
-				Vector3 local = v.transform.InverseTransformPoint(l.transform.position);
-				Vector2 lp = new Vector2(local.x, local.y);
-				if (lp.sqrMagnitude < 0.0001f)
-				{
-					Vector3 up = l.transform.up;
-					float a = Mathf.Atan2(up.y, up.x) * Mathf.Rad2Deg;
-					_fwd = Mathf.Round(Mathf.DeltaAngle(VehAng(v), a) / 90f) * 90f;
-				}
-				else
-				{
-					_fwd = Mathf.Round(Mathf.Atan2(lp.y, lp.x) * Mathf.Rad2Deg / 90f) * 90f;
-				}
-			}
-			else
-			{
-				Vector2 o = v.headLightLocalOffset;
-				if (o.sqrMagnitude < 0.01f) return;
-				_fwd = Mathf.Round(Mathf.Atan2(o.y, o.x) * Mathf.Rad2Deg / 90f) * 90f;
-			}
-			if (_fwd <= -180f) _fwd += 360f;
-			_fwdKnown = true;
-			_dirty = true;
-			try { File.WriteAllText(FwdPath, $"{BaseId()}|{_fwd.ToString("0", CI)}"); } catch { }
-			TLog.Info($"Base car nose points {_fwd:0} degrees in its own space");
+			if (v == null || v != _mine) return;
+			bool w = Input.GetKey(KeyCode.W), s = Input.GetKey(KeyCode.S);
+			if (w == s) return;
+			Vector2 vel = v.m_rigidbody != null ? v.m_rigidbody.velocity : Vector2.zero;
+			if (vel.sqrMagnitude < 1.5f * 1.5f) { return; }
+			float a = Mathf.Atan2(vel.y, vel.x) * Mathf.Rad2Deg + (s ? 180f : 0f);
+			float f = Mathf.Round(Mathf.DeltaAngle(VehAng(v), a) / 90f) * 90f;
+			if (f <= -180f) f += 360f;
+			if (Mathf.Abs(Mathf.DeltaAngle(f, _fwd)) < 1f) { _fwdVotes = 0; if (!_fwdKnown) Learned(); return; }
+			if (++_fwdVotes < 15) return;
+			_fwdVotes = 0;
+			_fwd = f;
+			Learned();
 		}
 		catch (Exception e) { TLog.Warn("forward: " + e.Message); }
+	}
+
+	private static void Learned()
+	{
+		_fwdKnown = true;
+		_dirty = true;
+		try { File.WriteAllText(FwdPath, $"v2|{BaseId()}|{_fwd.ToString("0", CI)}"); } catch { }
+		TLog.Info($"Base car nose points {_fwd:0} degrees in its own space (learned from driving)");
 	}
 
 	private static Vector2 Dir(float deg) => new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad));

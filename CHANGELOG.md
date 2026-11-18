@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.2
+- Fixed the tank being drawn backwards (W looked like reverse). The nose direction is now learned from how the tank actually moves when you hold W or S, instead of from the base car's headlights.
+
 ## 1.2.1
 - The tank's own shells can't hurt anyone inside a tank, driver or riders (`Armor.CrewSafeFromOwnShells`, on). People standing nearby outside the tank can still be hit.
 
