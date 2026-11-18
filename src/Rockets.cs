@@ -113,6 +113,7 @@ internal static class Rockets
 			try { rr.backBlastDamage = 0f; rr.backBlastForce = 0f; rr.backBlastRange = 0f; rr.backBlastSmokeCount = 0; } catch { }
 			try { rr.directHitDamage *= Mathf.Max(0f, TankPlugin.RocketDamage.Value); } catch { }
 			float speed = TankPlugin.RocketSpeed.Value > 0f ? TankPlugin.RocketSpeed.Value : _speed;
+			Safety.Mark(rr);
 			rr.Init(muzzle, target, speed);
 			if (_launchLog++ < 5)
 			{

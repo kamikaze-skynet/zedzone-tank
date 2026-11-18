@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.2.0";
+	public const string Version = "1.2.1";
 
 	internal static ManualLogSource L;
 
@@ -30,6 +30,8 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<bool> RocketsNeedAmmo;
 	internal static ConfigEntry<bool> RocketsIfNoShells;
 	internal static ConfigEntry<bool> RequireKit;
+	internal static ConfigEntry<bool> CrewSafe;
+	internal static ConfigEntry<float> CrewSafeRadius;
 	internal static ConfigEntry<float> RocketDamage;
 	internal static ConfigEntry<float> RocketSpeed;
 	internal static ConfigEntry<bool> MgNeedsAmmo;
@@ -57,6 +59,8 @@ public class TankPlugin : BasePlugin
 		ReloadSeconds = Config.Bind("MainGun", "ReloadSeconds", 2.5f, "Seconds between main gun shots.");
 		RocketsNeedAmmo = Config.Bind("MainGun", "UseAmmo", true, "Each shot uses one 105 mm Tank Shell from the tank's cargo or your backpack.");
 		RequireKit = Config.Bind("General", "RequireTankKit", true, "Page Up only calls in a tank when you carry a Tank Kit (built at a workbench), and uses the kit up. Off = free call-ins, limited by MaxTanks.");
+		CrewSafe = Config.Bind("Armor", "CrewSafeFromOwnShells", true, "The tank's own shells can't hurt anyone inside a tank (driver and riders).");
+		CrewSafeRadius = Config.Bind("Armor", "CrewSafeRadius", 3f, "Anyone this close to a tank's centre counts as riding in it (tiles).");
 		RocketsIfNoShells = Config.Bind("MainGun", "RocketsIfNoShells", false, "If the 105 mm shell item fails to load, use the game's recoilless rockets as ammo instead.");
 		RocketDamage = Config.Bind("MainGun", "DirectHitDamageMultiplier", 1f, "Multiplies the rocket's direct hit damage (its blast is the game's own).");
 		RocketSpeed = Config.Bind("MainGun", "RocketSpeed", 0f, "Rocket speed. 0 = the game's recoilless launcher speed.");
@@ -105,6 +109,7 @@ public class TankPlugin : BasePlugin
 			}
 		}
 		TLog.Info($"Patches: {ok}/{types.Length} ok, save hooks {saves}.");
+		Safety.Patch(h);
 	}
 
 	private static void LoadAllPost()

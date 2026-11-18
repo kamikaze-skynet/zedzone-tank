@@ -305,7 +305,7 @@ internal static partial class Tank
 		catch { return null; }
 	}
 
-	private static bool TankNear(Vector2 pos, float r)
+	internal static bool TankNear(Vector2 pos, float r)
 	{
 		try
 		{
