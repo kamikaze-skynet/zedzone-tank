@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace ZedTank;
 
-// Pieces of Vanish's Industrial Age helpers (FuelGen / AutoIO), used with permission.
+// Fuel and inventory helpers (FuelGen / AutoIO).
 internal static class FuelGen
 {
 	private static System.Collections.Generic.HashSet<int> _fuelIds;

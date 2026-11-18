@@ -13,4 +13,3 @@ A drivable main battle tank for ZED ZONE.
 Settings and keys: Mod Menu (F11).
 Coming next: crew seats for up to 4 players.
 
-Credits: the gun lock-on, effects and fuel code come from Vanish's Industrial Age helicopter, used with permission. Art is original.

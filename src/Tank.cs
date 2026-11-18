@@ -13,9 +13,8 @@ namespace ZedTank;
 
 // The tank is one of the game's own cars (so it drives, takes damage, carries cargo and
 // burns gasoline exactly like the game's cars) with its look replaced by a hull, a turret
-// that turns toward the mouse and a roof machine gun. The approach (tagging a base car with
-// a name id, hiding its renderers, remembering where tagged cars are) follows Vanish's
-// Industrial Age helicopter, used with permission.
+// that turns toward the mouse and a roof machine gun: a base car is tagged with a name id,
+// its renderers are hidden, and tagged cars are remembered per save.
 internal static partial class Tank
 {
 	public const int NameId = 88040;

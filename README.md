@@ -26,7 +26,3 @@ dotnet build src\Tank.csproj -c Release -p:GameDir="D:\SteamLibrary\steamapps\co
 ```
 
 The art works like the game's own cars: the tank is a 3D block model (`art-src/render_angles.py`, Python + NumPy + Pillow) pre-rendered from a tilted overhead view at 32 headings for the hull and 32 for the turret. In game the mod shows the hull frame that matches the tank's heading and the turret frame that matches where it aims. `python art-src/render_angles.py src` rewrites both sprite sheets.
-
-## Credits
-
-The car-tagging approach, gun lock-on, tracer effects and fuel-can code come from Vanish's Industrial Age helicopter, used with permission. Art is original.
