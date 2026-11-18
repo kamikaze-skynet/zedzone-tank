@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.2.1";
+	public const string Version = "1.7.1";
 
 	internal static ManualLogSource L;
 
@@ -30,7 +30,22 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<bool> RocketsNeedAmmo;
 	internal static ConfigEntry<bool> RocketsIfNoShells;
 	internal static ConfigEntry<bool> RequireKit;
+	internal static ConfigEntry<bool> HideClassic;
+	internal static ConfigEntry<bool> TankSounds;
+	internal static ConfigEntry<bool> BuildMenuTab;
 	internal static ConfigEntry<bool> CrewSafe;
+	internal static ConfigEntry<float> Model3DSize;
+	internal static ConfigEntry<float> Model3DZoom;
+	internal static ConfigEntry<bool> DrawDiagnostics;
+	internal static ConfigEntry<bool> BaseEnabled, BasePressGrass, BaseGrassPermanent;
+	internal static ConfigEntry<float> BaseMass, BaseArmour, BaseTopSpeed, BaseTurn, BaseGrassPress, BaseGrassSouth, BaseGrassPiece;
+	internal static ConfigEntry<int> Model3DPictureSize;
+	internal static ConfigEntry<bool> Model3DOnTop;
+	internal static ConfigEntry<float> Model3DNearClip;
+	internal static ConfigEntry<float> Model3DLift;
+	internal static ConfigEntry<bool> Model3DAboveGrassOnly;
+	internal static ConfigEntry<bool> Model3DFlip;
+	internal static ConfigEntry<string> MgSoundWeapon;
 	internal static ConfigEntry<float> CrewSafeRadius;
 	internal static ConfigEntry<float> RocketDamage;
 	internal static ConfigEntry<float> RocketSpeed;
@@ -53,11 +68,33 @@ public class TankPlugin : BasePlugin
 		NearbyRadius = Config.Bind("General", "NearbyRadius", 30f, new ConfigDescription("You can't call another tank while one is parked this close (tiles).", new AcceptableValueRange<float>(0f, 500f)));
 		StartFuel = Config.Bind("General", "StartFuel", 0.5f, new ConfigDescription("How full a new tank's fuel tank is (0 to 1).", new AcceptableValueRange<float>(0f, 1f)));
 		TankScale = Config.Bind("Look", "Scale", 1.1f, new ConfigDescription("Size of the tank's art.", new AcceptableValueRange<float>(0.5f, 3f)));
+		Model3DSize = Config.Bind("BattleTank", "Size", 1.25f, "Battle Tank (3D model) hull length compared with the base car's length.");
+		Model3DZoom = Config.Bind("BattleTank", "CameraZoomOut", 2.2f, "How far the car camera zooms out for the Battle Tank so its long gun isn't cut off (the picture is enlarged by the same amount, so the tank keeps its size).");
+		Model3DOnTop = Config.Bind("BattleTank", "DrawOnTop", true, "Draw the Battle Tank on top of grass and bushes like the classic tank (Look.SortingOrder). Off: sorted in with the grass like the game's cars.");
+		Model3DPictureSize = Config.Bind("BattleTank", "PictureSize", 768, "Pixel size of the picture the car camera films the Battle Tank into (the game uses 256 for cars; the tank is zoomed out, so it needs more to stay sharp). 0 keeps the game's picture.");
+		Model3DAboveGrassOnly = Config.Bind("BattleTank", "SortWithTrees", true, "Draw the Battle Tank just above tall grass, and let trees, bushes and buildings in front of it draw over it. Off: always on top (Look.SortingOrder).");
+		Model3DLift = Config.Bind("BattleTank", "PictureLift", 4f, "Raise the Battle Tank's flat picture this far toward the camera so tall grass can't hide it (0 = off).");
+		Model3DNearClip = Config.Bind("BattleTank", "CameraNearClip", 12f, "How far in front of the car camera the Battle Tank may reach before it is cut off (the camera is orthographic, so this can reach behind it).");
+		DrawDiagnostics = Config.Bind("Debug", "DrawDiagnostics", true, "Write how the Battle Tank is drawn (car camera, its picture, the quad on the map, every renderer) to Tank.log a few times after it appears.");
+		BaseEnabled = Config.Bind("BattleTankBase", "Enabled", true, "Make the pickup under a Battle Tank into a tank of its own: hit box the size of the tank, heavier, more armour, tank handling.");
+		BaseMass = Config.Bind("BattleTankBase", "Weight", 4f, "Battle Tank weight compared with the pickup it is built on (heavier pushes cars aside and isn't shoved by them).");
+		BaseArmour = Config.Bind("BattleTankBase", "Armour", 5f, "Battle Tank bodywork health compared with the pickup.");
+		BaseTopSpeed = Config.Bind("BattleTankBase", "TopSpeed", 0.8f, "Battle Tank top speed compared with the pickup.");
+		BaseTurn = Config.Bind("BattleTankBase", "TurnRate", 1f, "Battle Tank turning speed compared with the pickup.");
+		BaseGrassPiece = Config.Bind("BattleTankBase", "GrassPushCircle", 1.8f, "Size (metres) of each small grass-push circle the area is covered with. Smaller = stronger push but more circles needed.");
+		BaseGrassPress = Config.Bind("BattleTankBase", "GrassPushArea", 0f, "How far around the Battle Tank grass is pushed down: a circle whose radius is this times half the hull length (1.1 just covers the hull; 2 covers the whole tank with a wide margin).");
+		BaseGrassSouth = Config.Bind("BattleTankBase", "GrassPushBelow", 0.5f, "A second grass-push circle this far below the tank (times the hull length), because grass below the tank grows up the screen over it. 0 = off.");
+		BasePressGrass = Config.Bind("BattleTankBase", "TankCrushesGrass", false, "The Battle Tank crushes the grass it drives over so tall grass doesn't cover it.");
+		BaseGrassPermanent = Config.Bind("BattleTankBase", "CrushGrassPermanent", false, "Crushed grass stays gone in the world save (tank trails). Off: it grows back after a reload.");
+		Model3DFlip = Config.Bind("BattleTank", "FlipModel", false, "Turn the 3D model around if it drives backwards.");
 		SortingOrder = Config.Bind("Look", "SortingOrder", 32000, "Draw order of the tank's art (higher draws on top of more things).");
 		CrewDamage = Config.Bind("Armor", "CrewDamageTaken", 0.1f, new ConfigDescription("Share of damage that reaches the crew inside (a car is much higher).", new AcceptableValueRange<float>(0f, 1f)));
 		TurretSpeed = Config.Bind("MainGun", "TurretTurnSpeed", 120f, "How fast the turret turns toward the mouse (degrees per second).");
 		ReloadSeconds = Config.Bind("MainGun", "ReloadSeconds", 2.5f, "Seconds between main gun shots.");
 		RocketsNeedAmmo = Config.Bind("MainGun", "UseAmmo", true, "Each shot uses one 105 mm Tank Shell from the tank's cargo or your backpack.");
+		HideClassic = Config.Bind("General", "BattleTankOnly", true, "Only the Battle Tank: the old Tank Kit can't be crafted any more, and every call-in (also with an old Tank Kit) brings a Battle Tank. Tanks already in a save stay as they are.");
+		BuildMenuTab = Config.Bind("General", "BuildMenuTab", true, "A VEHICLES tab in the Build menu where the Battle Tank can be built from the materials you carry.");
+		TankSounds = Config.Bind("Effects", "TankSounds", true, "Real tank engine start-up, idle and moving sounds instead of the base car's engine.");
 		RequireKit = Config.Bind("General", "RequireTankKit", true, "Page Up only calls in a tank when you carry a Tank Kit (built at a workbench), and uses the kit up. Off = free call-ins, limited by MaxTanks.");
 		CrewSafe = Config.Bind("Armor", "CrewSafeFromOwnShells", true, "The tank's own shells can't hurt anyone inside a tank (driver and riders).");
 		CrewSafeRadius = Config.Bind("Armor", "CrewSafeRadius", 3f, "Anyone this close to a tank's centre counts as riding in it (tiles).");
@@ -72,6 +109,7 @@ public class TankPlugin : BasePlugin
 		MgRange = Config.Bind("MachineGun", "Range", 22f, "Machine gun range (tiles).");
 		NoiseRadius = Config.Bind("Effects", "NoiseRadius", 30f, "Zombies within this range hear the guns.");
 		FxScale = Config.Bind("Effects", "EffectScale", 2f, "Size of tracers, muzzle flashes and smoke.");
+		MgSoundWeapon = Config.Bind("Effects", "MachineGunSoundFrom", "", "Part of a gun's name (or fire sound name) to borrow the machine gun sound from, e.g. M249. Empty = pick a machine gun automatically. The choices are listed in BepInEx\\Tank.log.");
 		Volume = Config.Bind("Effects", "Volume", 0.8f, new ConfigDescription("Gun volume.", new AcceptableValueRange<float>(0f, 1f)));
 		try
 		{
@@ -91,7 +129,7 @@ public class TankPlugin : BasePlugin
 		if (_patched) return;
 		_patched = true;
 		var h = new Harmony(Guid);
-		Type[] types = { typeof(P_MouseDown), typeof(P_MouseHold), typeof(P_Name1), typeof(P_Name2), typeof(P_Name3) };
+		Type[] types = { typeof(P_MouseDown), typeof(P_MouseHold), typeof(P_Name1), typeof(P_Name2), typeof(P_Name3), typeof(P_LootTitle), typeof(P_BuildEnsure), typeof(P_BuildOpen), typeof(P_BuildTab), typeof(P_BuildList), typeof(P_BuildAttr), typeof(P_BuildCard), typeof(P_BuildDetails), typeof(P_BuildGo), typeof(P_BuildCardClick), typeof(P_BuildAttrName), typeof(P_BuildAttrDesc), typeof(P_BuildAttrCan) };
 		int ok = 0;
 		foreach (Type t in types)
 		{
@@ -137,6 +175,7 @@ public class TankRunner : MonoBehaviour
 		if (Time.frameCount % 120 == 0) { try { var im = ItemManager.instance; if (im != null && im.itemList != null && im.itemList.Count > 0) Bundled.LoadMissing("late"); } catch { } }
 		Active = TankPlugin.Enabled.Value;
 		if (!Active) return;
+		try { BuildMenu.Tick(); } catch { }
 		try { Tank.Tick(Time.deltaTime); }
 		catch (Exception e) { TLog.Warn("tick: " + e.Message); }
 	}

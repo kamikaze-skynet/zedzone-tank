@@ -1,15 +1,22 @@
 [h1]Tank[/h1]
-A drivable main battle tank for ZED ZONE.
+A drivable main battle tank for ZED ZONE: a real 3D model with a turret that turns in 3D.
+
+[h2]Requirements[/h2]
+[list]
+[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3834614258]ZED ZONE Code Mod Loader[/url]: it installs BepInEx. After subscribing, run [b]install.cmd[/b] once from steamapps/workshop/content/1211600/3834614258/ (as administrator if the game is in Program Files), then start the game through Steam.
+[*][url=https://steamcommunity.com/sharedfiles/filedetails/?id=3840681498]Mod Menu[/url] for settings and keys (F11).
+[/list]
 
 [list]
-[*]Build a [b]Tank Kit[/b] at a workbench (60 Iron Plate, 20 Metal Component, 10 Copper Tube, 20 Iron Wire, 10 Copper Wire), carry it and press [b]Page Up[/b]: the tank is assembled in front of you and the kit is used up.
+[*][b]Build it[/b]: open the Build menu, go to the new [b]VEHICLES[/b] tab and build the [b]Battle Tank[/b] (60 Iron Plate, 20 Metal Component, 10 Copper Tube, 20 Iron Wire, 10 Copper Wire, carried). It rolls out a few tiles in front of you.
+[*]Or craft a [b]Battle Tank Kit[/b] at a workbench (same materials), carry it and press [b]Page Up[/b].
+[*]Real tank sounds: diesel engine start-up, idle and a moving loop with the tracks.
 [*]Drives like the game's cars and [b]burns gasoline the same way[/b]. [b]Shift + Page Up[/b] next to it pours your gas cans in.
 [*]The [b]turret follows your mouse[/b].
 [*][b]Left click[/b]: main gun, fires 105 mm Tank Shells, a new ammo item (one per shot from the cargo or your backpack).
 [*][b]Right click[/b]: roof machine gun, locks on to the zombie nearest your mouse (5.56mm or 7.62x39mm rounds).
-[*]Heavy armour: the crew takes a fraction of the damage they would in a car.
+[*]Heavy armour: the crew takes a fraction of the damage they would in a car. Tall grass bends around it, trees in front still cover it.
 [/list]
 
 Settings and keys: Mod Menu (F11).
 Coming next: crew seats for up to 4 players.
-

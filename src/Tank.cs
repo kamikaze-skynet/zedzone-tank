@@ -18,6 +18,7 @@ namespace ZedTank;
 internal static partial class Tank
 {
 	public const int NameId = 88040;
+	public const int NameId3D = 88041; // the Battle Tank: a real 3D model (src/Model3D.cs)
 
 	// The art is a 3D block model pre-rendered from the game's tilted overhead view at 32
 	// headings (art-src/render_angles.py), like the game's cars, which are 3D models filmed
@@ -49,6 +50,7 @@ internal static partial class Tank
 	private static readonly CultureInfo CI = CultureInfo.InvariantCulture;
 	private static readonly Dictionary<IntPtr, Vis> _vis = new Dictionary<IntPtr, Vis>();
 	private static readonly List<Vector2> _known = new List<Vector2>();
+	private static readonly List<bool> _known3 = new List<bool>(); // same index: is it a Battle Tank (3D)
 	private static readonly Dictionary<IntPtr, int> _knownIdx = new Dictionary<IntPtr, int>();
 
 	private static long _saveId = -1;
@@ -60,13 +62,16 @@ internal static partial class Tank
 	private static float _callWait;
 	private static float _cannonAt;
 	private static float _mgAt;
-	// The base car's nose direction in its own space. 180 is what the pickup (the base car in
-	// this game version) uses; it's confirmed from the headlights and cached in Tank.forward.txt.
-	private static float _fwd = 180f;
+	// The base car's nose direction in its own space. It's learned from how the car actually
+	// moves while you hold W (or S) and cached in Tank.forward.txt. 0 until learned.
+	private static float _fwd = 0f;
+	private static int _fwdVotes;
 	private static bool _fwdKnown;
 	private static int _baseId = -1;
 	private static int _sortLayer;
 	private static bool _sortSet;
+	internal static bool SortKnown => _sortSet;
+	internal static int SortLayer => _sortLayer;
 	private static Sprite[] _hullFr, _turretFr;
 	private static bool _spriteTried;
 	private static string _msg;
@@ -88,9 +93,10 @@ internal static partial class Tank
 		{
 			if (_fwdKnown || !File.Exists(FwdPath)) return;
 			string[] a = File.ReadAllText(FwdPath).Trim().Split('|');
-			if (a.Length >= 2 && int.Parse(a[0], CI) == BaseId())
+			// v2 = learned from driving (older files came from the headlights and could be backwards)
+			if (a.Length >= 3 && a[0] == "v2" && int.Parse(a[1], CI) == BaseId())
 			{
-				_fwd = F(a[1]);
+				_fwd = F(a[2]);
 				_fwdKnown = true;
 				TLog.Info($"Base car nose direction {_fwd:0} (cached)");
 			}
@@ -119,17 +125,31 @@ internal static partial class Tank
 		try
 		{
 			if (v == null) return false;
-			if (v.vehicleNameTextId == NameId) return true;
+			int id = v.vehicleNameTextId;
+			if (id == NameId || id == NameId3D) return true;
 			VehicleData d = v.vehicleData;
-			return d != null && d.vehicleNameTextId == NameId;
+			return d != null && (d.vehicleNameTextId == NameId || d.vehicleNameTextId == NameId3D);
 		}
 		catch { return false; }
 	}
 
-	private static void Tag(BasicVehicle v)
+	public static bool Is3D(BasicVehicle v)
 	{
-		try { v.vehicleNameTextId = NameId; } catch { }
-		try { if (v.vehicleData != null) v.vehicleData.vehicleNameTextId = NameId; } catch { }
+		try
+		{
+			if (v == null) return false;
+			if (v.vehicleNameTextId == NameId3D) return true;
+			VehicleData d = v.vehicleData;
+			return d != null && d.vehicleNameTextId == NameId3D;
+		}
+		catch { return false; }
+	}
+
+	private static void Tag(BasicVehicle v, bool d3)
+	{
+		int id = d3 ? NameId3D : NameId;
+		try { v.vehicleNameTextId = id; } catch { }
+		try { if (v.vehicleData != null) v.vehicleData.vehicleNameTextId = id; } catch { }
 		Toughen(v);
 	}
 
@@ -183,6 +203,7 @@ internal static partial class Tank
 	{
 		_called = 0;
 		_known.Clear();
+		_known3.Clear();
 		_knownIdx.Clear();
 		ClearVis();
 		_mine = null;
@@ -192,9 +213,9 @@ internal static partial class Tank
 			foreach (string line in File.ReadAllLines(FilePath))
 			{
 				string[] a = line.Split('|');
-				if (a[0] == "K" && a.Length >= 3) _known.Add(new Vector2(F(a[1]), F(a[2])));
+				if (a[0] == "K" && a.Length >= 3) { _known.Add(new Vector2(F(a[1]), F(a[2]))); _known3.Add(a.Length >= 4 && a[3] == "3"); }
 				else if (a[0] == "C" && a.Length >= 2) _called = int.Parse(a[1], CI);
-				else if (a[0] == "R" && a.Length >= 2) { _fwd = F(a[1]); _fwdKnown = true; }
+				else if (a[0] == "R2" && a.Length >= 2) { _fwd = F(a[1]); _fwdKnown = true; }
 			}
 			TLog.Info($"Save {_saveId}: {_known.Count} tank(s) on record, {_called} called in");
 		}
@@ -207,8 +228,12 @@ internal static partial class Tank
 		{
 			var sb = new StringBuilder();
 			sb.AppendLine("C|" + _called.ToString(CI));
-			if (_fwdKnown) sb.AppendLine("R|" + _fwd.ToString("0", CI));
-			foreach (Vector2 k in _known) sb.AppendLine($"K|{k.x.ToString("0.##", CI)}|{k.y.ToString("0.##", CI)}");
+			if (_fwdKnown) sb.AppendLine("R2|" + _fwd.ToString("0", CI));
+			for (int i = 0; i < _known.Count; i++)
+			{
+				Vector2 k = _known[i];
+				sb.AppendLine($"K|{k.x.ToString("0.##", CI)}|{k.y.ToString("0.##", CI)}|{(i < _known3.Count && _known3[i] ? "3" : "1")}");
+			}
 			File.WriteAllText(FilePath, sb.ToString(), new UTF8Encoding(false));
 			_dirty = false;
 		}
@@ -248,6 +273,7 @@ internal static partial class Tank
 				if (idx < 0)
 				{
 					_known.Add(p);
+					_known3.Add(Is3D(v));
 					idx = _known.Count - 1;
 					_dirty = true;
 				}
@@ -273,7 +299,7 @@ internal static partial class Tank
 			Vector2 p = VehPos(v);
 			int idx = Nearest(p, 2.5f, used);
 			if (idx < 0) continue;
-			Tag(v);
+			Tag(v, idx < _known3.Count && _known3[idx]);
 			_knownIdx[v.Pointer] = idx;
 			used.Add(idx);
 			if (_retagLog++ < 8) TLog.Info($"Re-tagged the tank at {p.x:0.#},{p.y:0.#} after loading");
@@ -320,7 +346,7 @@ internal static partial class Tank
 		return false;
 	}
 
-	private static BasicVehicle Spawn(Vector2 pos, float heading)
+	private static BasicVehicle Spawn(Vector2 pos, float heading, bool d3)
 	{
 		GameController gc = GameController.instance;
 		int baseId = BaseId();
@@ -332,7 +358,7 @@ internal static partial class Tank
 		try { vd = gc.GetPristineVehicleData(baseId, heading); }
 		catch (Exception e) { TLog.Warn("GetPristineVehicleData: " + e.Message); return null; }
 		if (vd == null) return null;
-		vd.vehicleNameTextId = NameId;
+		vd.vehicleNameTextId = d3 ? NameId3D : NameId;
 		try { vd.worldCoordinate = pos; } catch { }
 		try { vd.coordinateX = pos.x; vd.coordinateY = pos.y; } catch { }
 		try { vd.eularAngleZ = heading; } catch { }
@@ -358,7 +384,7 @@ internal static partial class Tank
 		}
 		else
 		{
-			Tag(v);
+			Tag(v, d3);
 			try
 			{
 				v.transform.position = new Vector3(pos.x, pos.y, v.transform.position.z);
@@ -374,14 +400,15 @@ internal static partial class Tank
 			}
 			catch { }
 			_known.Add(pos);
+			_known3.Add(d3);
 			_knownIdx[v.Pointer] = _known.Count - 1;
 			_dirty = true;
 		}
-		if (_spawnLog++ < 8) TLog.Info($"Spawn tank (base car {baseId}, {how}) at {pos.x:0.#},{pos.y:0.#}: {(v != null ? $"ok, fuel {Fuel(v):0.#}/{Cap(v.vehicleData):0} L" : "FAILED")}");
+		if (_spawnLog++ < 8) TLog.Info($"Spawn {(d3 ? "Battle Tank (3D)" : "tank")} (base car {baseId}, {how}) at {pos.x:0.#},{pos.y:0.#}: {(v != null ? $"ok, fuel {Fuel(v):0.#}/{Cap(v.vehicleData):0} L" : "FAILED")}");
 		return v;
 	}
 
-	internal static string CallIn(HumanCharacterController pc, bool ignoreLimit, bool useKit = false)
+	internal static string CallIn(HumanCharacterController pc, bool ignoreLimit, bool useKit = false, bool battle = false)
 	{
 		if (pc == null) return Fail("Load into a world first");
 		try { if (pc.drivingVehicle != null) return Fail("Get out of the vehicle first"); } catch { }
@@ -389,22 +416,28 @@ internal static partial class Tank
 		Vector2 here = pc.transform.position;
 		if (!ignoreLimit && TankNear(here, TankPlugin.NearbyRadius.Value)) return Fail("There's already a tank close by");
 		// With a crafted Tank Kit the kit is the cost, so the per-save limit doesn't apply.
+		// A Battle Tank Kit (3D model) is used first when you carry both kinds.
 		int kitId = -1;
+		bool d3 = battle;
 		if (useKit)
 		{
-			kitId = Bundled.KitId();
-			if (kitId <= 0) return Fail("The Tank Kit item didn't load (see BepInEx\\Tank.log)");
-			if (Count(Carried(pc), kitId) < 1) return Fail("You need a Tank Kit: build one at a workbench and carry it");
+			int k3 = Bundled.Kit3DId(), k1 = Bundled.KitId();
+			var carried = Carried(pc);
+			if (k3 > 0 && Count(carried, k3) >= 1) { kitId = k3; d3 = true; }
+			else if (k1 > 0 && Count(carried, k1) >= 1) { kitId = k1; d3 = false; }
+			else if (k1 <= 0 && k3 <= 0) return Fail("The Tank Kit items didn't load (see BepInEx\\Tank.log)");
+			else return Fail(TankPlugin.HideClassic.Value ? "You need a Battle Tank Kit: build one at a workbench and carry it" : "You need a Tank Kit or a Battle Tank Kit: build one at a workbench and carry it");
 		}
+		if (TankPlugin.HideClassic.Value) d3 = true;
 		int max = TankPlugin.MaxTanks.Value;
 		if (!ignoreLimit && !useKit && max > 0 && _called >= max) return Fail($"This save has already called in {max} tank(s) (setting MaxTanks)");
 		Vector2 spot = here + new Vector2(0f, -5f);
-		if (Spawn(spot, 0f) != null)
+		if (Spawn(spot, 0f, d3) != null)
 		{
 			if (useKit && AutoIO.Take(Carried(pc), kitId, 1f) < 1f) TLog.Warn("Tank Kit: tank delivered but the kit couldn't be taken");
 			_called++;
 			Save();
-			return Ok("Tank delivered. Get in, start the engine and roll out.");
+			return Ok((d3 ? "Battle Tank" : "Tank") + " delivered. Get in, start the engine and roll out.");
 		}
 		return Fail("No room for a tank here, try an open spot");
 	}
@@ -420,7 +453,8 @@ internal static partial class Tank
 			Refuel(pc);
 			return;
 		}
-		CallIn(pc, false, TankPlugin.RequireKit.Value);
+		bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+		CallIn(pc, false, TankPlugin.RequireKit.Value, ctrl); // without kits, Ctrl+Page Up brings the Battle Tank
 	}
 
 	// ------------------------------------------------------------------ fuel (the game's car fuel)
@@ -535,7 +569,7 @@ internal static partial class Tank
 		return list;
 	}
 
-	private static int Count(List<InventoryData> boxes, int id)
+	internal static int Count(List<InventoryData> boxes, int id)
 	{
 		float n = 0f;
 		foreach (InventoryData b in boxes)
@@ -566,41 +600,36 @@ internal static partial class Tank
 
 	private static float Heading(BasicVehicle v) => VehAng(v) + _fwd;
 
-	// Which way the base car's nose points in its own space, from its headlights.
+	// Which way the base car's nose points in its own space: while the local driver holds W
+	// (and not S) the car rolls nose first, so its velocity shows where the nose is. S is the
+	// mirror case. A few agreeing frames in a row settle it, and it is re-checked every drive.
 	private static void FindForward(BasicVehicle v)
 	{
-		if (_fwdKnown) return;
 		try
 		{
-			Light2D l = v.headlight_Left ?? v.headlight_Right;
-			if (l != null)
-			{
-				Vector3 local = v.transform.InverseTransformPoint(l.transform.position);
-				Vector2 lp = new Vector2(local.x, local.y);
-				if (lp.sqrMagnitude < 0.0001f)
-				{
-					Vector3 up = l.transform.up;
-					float a = Mathf.Atan2(up.y, up.x) * Mathf.Rad2Deg;
-					_fwd = Mathf.Round(Mathf.DeltaAngle(VehAng(v), a) / 90f) * 90f;
-				}
-				else
-				{
-					_fwd = Mathf.Round(Mathf.Atan2(lp.y, lp.x) * Mathf.Rad2Deg / 90f) * 90f;
-				}
-			}
-			else
-			{
-				Vector2 o = v.headLightLocalOffset;
-				if (o.sqrMagnitude < 0.01f) return;
-				_fwd = Mathf.Round(Mathf.Atan2(o.y, o.x) * Mathf.Rad2Deg / 90f) * 90f;
-			}
-			if (_fwd <= -180f) _fwd += 360f;
-			_fwdKnown = true;
-			_dirty = true;
-			try { File.WriteAllText(FwdPath, $"{BaseId()}|{_fwd.ToString("0", CI)}"); } catch { }
-			TLog.Info($"Base car nose points {_fwd:0} degrees in its own space");
+			if (v == null || v != _mine) return;
+			bool w = Input.GetKey(KeyCode.W), s = Input.GetKey(KeyCode.S);
+			if (w == s) return;
+			Vector2 vel = v.m_rigidbody != null ? v.m_rigidbody.velocity : Vector2.zero;
+			if (vel.sqrMagnitude < 1.5f * 1.5f) { return; }
+			float a = Mathf.Atan2(vel.y, vel.x) * Mathf.Rad2Deg + (s ? 180f : 0f);
+			float f = Mathf.Round(Mathf.DeltaAngle(VehAng(v), a) / 90f) * 90f;
+			if (f <= -180f) f += 360f;
+			if (Mathf.Abs(Mathf.DeltaAngle(f, _fwd)) < 1f) { _fwdVotes = 0; if (!_fwdKnown) Learned(); return; }
+			if (++_fwdVotes < 15) return;
+			_fwdVotes = 0;
+			_fwd = f;
+			Learned();
 		}
 		catch (Exception e) { TLog.Warn("forward: " + e.Message); }
+	}
+
+	private static void Learned()
+	{
+		_fwdKnown = true;
+		_dirty = true;
+		try { File.WriteAllText(FwdPath, $"v2|{BaseId()}|{_fwd.ToString("0", CI)}"); } catch { }
+		TLog.Info($"Base car nose points {_fwd:0} degrees in its own space (learned from driving)");
 	}
 
 	private static Vector2 Dir(float deg) => new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad));
@@ -746,6 +775,30 @@ internal static partial class Tank
 
 	// ------------------------------------------------------------------ per frame
 
+	private static float _recipeCheck;
+	private static bool _recipeLogged;
+
+	// Battle Tank only: take the old Tank Kit's recipe out of the crafting lists (checked now and
+	// then, in case the game registers mod recipes again).
+	private static void HideClassicRecipe()
+	{
+		if (!TankPlugin.HideClassic.Value) return;
+		float now = Time.realtimeSinceStartup;
+		if (now < _recipeCheck) return;
+		_recipeCheck = now + 5f;
+		try
+		{
+			int id = Bundled.KitId();
+			ItemManager im = ItemManager.instance;
+			if (id <= 0 || im == null) return;
+			var r = im.GetRecipeDatasById(id);
+			if (r == null || r.Length == 0) return;
+			im.UnregisterModRecipes(id);
+			if (!_recipeLogged) { _recipeLogged = true; TLog.Info($"Battle Tank only: old Tank Kit recipe removed ({r.Length})"); }
+		}
+		catch (Exception e) { if (!_recipeLogged) { _recipeLogged = true; TLog.Warn("hiding the Tank Kit recipe: " + e.Message); } }
+	}
+
 	public static void Tick(float dt)
 	{
 		GameController gc = GameController.instance;
@@ -761,6 +814,7 @@ internal static partial class Tank
 		catch { return; }
 		HumanCharacterController pc = gc.playerCharacter;
 		if (pc == null) return;
+		HideClassicRecipe();
 		if (sid != _saveId || gd != _gdPtr)
 		{
 			_saveId = sid;
@@ -831,14 +885,22 @@ internal static partial class Tank
 				BasicVehicle v = live[i];
 				if (!IsTank(v)) continue;
 				seen.Add(v.Pointer);
-				FindForward(v);
 				Vis x = EnsureVis(v);
-				HideCar(v, x, now);
+				bool d3 = Is3D(v) && Model3D.Tick(v, x.TurretRel, now);
+				if (Is3D(v)) TankBase.Apply(v);
+				TankSound.Tick(v);
+				if (x.Hull.enabled == d3) { x.Hull.enabled = !d3; x.HullShadow.enabled = !d3; x.Turret.enabled = !d3; }
+				if (!d3)
+				{
+					FindForward(v);
+					HideCar(v, x, now);
+				}
 				bool hidden = false;
 				try { hidden = v.layerHiddenFlag || !v.gameObject.activeInHierarchy; } catch { }
 				if (x.Root.activeSelf == hidden) x.Root.SetActive(!hidden);
 				Vector2 p = VehPos(v);
 				float h = Heading(v);
+				if (d3 && Model3D.Heading(v, out float h3)) h = h3;
 				x.Root.transform.position = new Vector3(p.x, p.y, v.transform.position.z - 0.5f);
 				x.Root.transform.localScale = new Vector3(TankPlugin.TankScale.Value, TankPlugin.TankScale.Value, 1f);
 				x.Heading = h;
@@ -852,6 +914,7 @@ internal static partial class Tank
 					x.TurretRel = Mathf.DeltaAngle(0f, next - h);
 				}
 				x.TurretWorld = h + x.TurretRel;
+				if (d3) continue;
 				Sprite hs = _hullFr[FrameOf(h)];
 				if (x.Hull.sprite != hs) { x.Hull.sprite = hs; x.HullShadow.sprite = hs; }
 				Sprite ts = _turretFr[FrameOf(x.TurretWorld)];
@@ -865,6 +928,8 @@ internal static partial class Tank
 		{
 			try { if (_vis[k].Root != null) Object.Destroy(_vis[k].Root); } catch { }
 			_vis.Remove(k);
+			Model3D.Forget(k);
+			TankSound.Forget(k);
 		}
 	}
 
@@ -926,6 +991,7 @@ internal static partial class Tank
 		Vector2 pos = VehPos(v);
 		Vector2 piv = pos + Project(RingTop, 0f);
 		Vector2 muzzle = pos + Project(BarrelTip, ang) + dir * 0.3f;
+		if (Is3D(v) && Model3D.TurretPoint(v, Model3D.BarrelTip, out Vector2 m3)) muzzle = m3 + dir * 0.3f;
 		float dist = Mathf.Max((Mouse() - muzzle).magnitude, 3f);
 		Vector2 target = muzzle + dir * dist;
 		if (Rockets.Launch(pc, muzzle, target, ang))
@@ -959,6 +1025,7 @@ internal static partial class Tank
 			}
 		}
 		Vector2 muzzle = VehPos(v) + Project(MgTip, x.TurretWorld);
+		if (Is3D(v) && Model3D.TurretPoint(v, Model3D.MgTip, out Vector2 m3)) muzzle = m3;
 		Vector2 aim = Mouse();
 		float ang = Mathf.Atan2(aim.y - muzzle.y, aim.x - muzzle.x) * Mathf.Rad2Deg;
 		if ((aim - muzzle).magnitude > TankPlugin.MgRange.Value) aim = muzzle + (aim - muzzle).normalized * TankPlugin.MgRange.Value;
