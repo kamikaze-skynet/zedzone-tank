@@ -144,6 +144,10 @@ internal static class TankBase
 			w.z = 0f;
 			int before = g.framePresserCount;
 			bool ok = g.PressGrass(w, r, 1f);
+			// Grass blades stand up the screen, so the ones below the tank are the ones that
+			// reach over it: a second circle further down covers them.
+			float south = TankPlugin.BaseGrassSouth.Value;
+			if (south > 0f) ok &= g.PressGrass(w + new Vector3(0f, -len * south * Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.y)), 0f), r, 1f);
 			if (_bigLog < 3 || (!ok && _bigLog < 6))
 			{
 				_bigLog++;

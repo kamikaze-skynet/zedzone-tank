@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.6
+
+- Bigger grass push around the Battle Tank: radius 2x half the hull (BattleTankBase.GrassPushRadius, replaces GrassPushSize), plus a second circle below the tank (GrassPushDown 0.6), since grass below it grows up the screen over the hull.
+
 ## 1.5.5
 
 - The Battle Tank pushes grass down over a bigger area: an extra grass presser over the tank's middle, covering the whole tank and a margin around it (BattleTankBase.GrassPushSize, default 1.4). Grass is pushed down, not cut, like any other vehicle. Tank.log prints the first few 'Tank grass press' lines.
