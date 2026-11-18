@@ -670,6 +670,19 @@ internal static class Model3D
 			float near = -TankPlugin.Model3DNearClip.Value;
 			if (c.orthographic && c.nearClipPlane > near) c.nearClipPlane = near;
 
+			// Like the classic tank's art: draw the car picture on the player's sprite layer at a
+			// high order, so tall grass and bushes don't cover it. The game sorts car pictures in
+			// with the grass, which buried this big tank.
+			if (TankPlugin.Model3DOnTop.Value && Tank.SortKnown)
+			{
+				Renderer qr = v.vehicleQuadRenderer;
+				if (qr != null)
+				{
+					int ord = TankPlugin.SortingOrder.Value;
+					if (qr.sortingLayerID != Tank.SortLayer) qr.sortingLayerID = Tank.SortLayer;
+					if (qr.sortingOrder != ord) qr.sortingOrder = ord;
+				}
+			}
 			int want = TankPlugin.Model3DPictureSize.Value;
 			RenderTexture cur = c.targetTexture;
 			if (want <= 0 || cur == null) return;

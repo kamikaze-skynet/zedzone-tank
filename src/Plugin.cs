@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.5.8";
+	public const string Version = "1.5.9";
 
 	internal static ManualLogSource L;
 
@@ -37,6 +37,7 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<bool> BaseEnabled, BasePressGrass, BaseGrassPermanent;
 	internal static ConfigEntry<float> BaseMass, BaseArmour, BaseTopSpeed, BaseTurn, BaseGrassPress, BaseGrassSouth, BaseGrassPiece;
 	internal static ConfigEntry<int> Model3DPictureSize;
+	internal static ConfigEntry<bool> Model3DOnTop;
 	internal static ConfigEntry<float> Model3DNearClip;
 	internal static ConfigEntry<bool> Model3DFlip;
 	internal static ConfigEntry<string> MgSoundWeapon;
@@ -64,6 +65,7 @@ public class TankPlugin : BasePlugin
 		TankScale = Config.Bind("Look", "Scale", 1.1f, new ConfigDescription("Size of the tank's art.", new AcceptableValueRange<float>(0.5f, 3f)));
 		Model3DSize = Config.Bind("BattleTank", "Size", 1.25f, "Battle Tank (3D model) hull length compared with the base car's length.");
 		Model3DZoom = Config.Bind("BattleTank", "CameraZoomOut", 2.2f, "How far the car camera zooms out for the Battle Tank so its long gun isn't cut off (the picture is enlarged by the same amount, so the tank keeps its size).");
+		Model3DOnTop = Config.Bind("BattleTank", "DrawOnTop", true, "Draw the Battle Tank on top of grass and bushes like the classic tank (Look.SortingOrder). Off: sorted in with the grass like the game's cars.");
 		Model3DPictureSize = Config.Bind("BattleTank", "PictureSize", 768, "Pixel size of the picture the car camera films the Battle Tank into (the game uses 256 for cars; the tank is zoomed out, so it needs more to stay sharp). 0 keeps the game's picture.");
 		Model3DNearClip = Config.Bind("BattleTank", "CameraNearClip", 12f, "How far in front of the car camera the Battle Tank may reach before it is cut off (the camera is orthographic, so this can reach behind it).");
 		DrawDiagnostics = Config.Bind("Debug", "DrawDiagnostics", true, "Write how the Battle Tank is drawn (car camera, its picture, the quad on the map, every renderer) to Tank.log a few times after it appears.");
@@ -73,7 +75,7 @@ public class TankPlugin : BasePlugin
 		BaseTopSpeed = Config.Bind("BattleTankBase", "TopSpeed", 0.8f, "Battle Tank top speed compared with the pickup.");
 		BaseTurn = Config.Bind("BattleTankBase", "TurnRate", 1f, "Battle Tank turning speed compared with the pickup.");
 		BaseGrassPiece = Config.Bind("BattleTankBase", "GrassPushCircle", 1.8f, "Size (metres) of each small grass-push circle the area is covered with. Smaller = stronger push but more circles needed.");
-		BaseGrassPress = Config.Bind("BattleTankBase", "GrassPushArea", 1.3f, "How far around the Battle Tank grass is pushed down: a circle whose radius is this times half the hull length (1.1 just covers the hull; 2 covers the whole tank with a wide margin).");
+		BaseGrassPress = Config.Bind("BattleTankBase", "GrassPushArea", 0f, "How far around the Battle Tank grass is pushed down: a circle whose radius is this times half the hull length (1.1 just covers the hull; 2 covers the whole tank with a wide margin).");
 		BaseGrassSouth = Config.Bind("BattleTankBase", "GrassPushBelow", 0.5f, "A second grass-push circle this far below the tank (times the hull length), because grass below the tank grows up the screen over it. 0 = off.");
 		BasePressGrass = Config.Bind("BattleTankBase", "TankCrushesGrass", false, "The Battle Tank crushes the grass it drives over so tall grass doesn't cover it.");
 		BaseGrassPermanent = Config.Bind("BattleTankBase", "CrushGrassPermanent", false, "Crushed grass stays gone in the world save (tank trails). Off: it grows back after a reload.");

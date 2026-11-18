@@ -70,6 +70,8 @@ internal static partial class Tank
 	private static int _baseId = -1;
 	private static int _sortLayer;
 	private static bool _sortSet;
+	internal static bool SortKnown => _sortSet;
+	internal static int SortLayer => _sortLayer;
 	private static Sprite[] _hullFr, _turretFr;
 	private static bool _spriteTried;
 	private static string _msg;

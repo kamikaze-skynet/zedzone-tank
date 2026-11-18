@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.9
+
+- Battle Tank draws on top of tall grass and bushes like the classic tank: its car picture goes on the player's sprite layer at Look.SortingOrder (BattleTank.DrawOnTop). The game sorts car pictures in with the grass, which buried this big tank.
+- The extra grass pushing from 1.5.5-1.5.8 is off by default now (BattleTankBase.GrassPushArea 0); the game's own car grass pushing stays.
+
 ## 1.5.8
 
 - Grass push uses many small circles instead of one huge one (a huge circle only bent the grass a little near the tank). Circles of GrassPushCircle metres cover GrassPushArea around the tank plus GrassPushBelow under it, closest to the tank first, as many as the game's free slots allow. New config keys, so earlier values don't carry over.
