@@ -128,6 +128,7 @@ internal static class TankBase
 	// Like any other vehicle the tank pushes the grass down rather than cutting it, but over a
 	// bigger area: one extra presser over the tank's middle, sized from the hull length.
 	private static float _maxR = -1f;
+	private static readonly List<Vector2> _pts = new List<Vector2>();
 	private static int _probeLog;
 
 	private static void BigPress(BasicVehicle v, CapsuleCollider2D col, Orig o)
@@ -164,18 +165,28 @@ internal static class TankBase
 				if (_maxR <= 0f) { _maxR = -1f; return; }
 				free--;
 			}
-			float rr = Mathf.Min(_maxR, R);
-			// tile the area (circle of R around the middle, stretched down by 'down') with circles of rr
-			float step = rr * 1.35f;
-			int n = 0;
-			for (float y = R; y >= -R - down - 1e-3f && n < free; y -= step)
-				for (float x = -R; x <= R + 1e-3f && n < free; x += step)
+			// One huge circle bends the grass only a little near the tank (the push fades with
+			// distance over the whole radius), so the area is covered with small circles instead,
+			// closest to the tank first, as many as the free slots allow.
+			float rr = Mathf.Min(_maxR, Mathf.Max(0.8f, TankPlugin.BaseGrassPiece.Value * sc));
+			float step = rr * 1.3f;
+			_pts.Clear();
+			for (float y = R; y >= -R - down - 1e-3f; y -= step)
+				for (float x = -R; x <= R + 1e-3f; x += step)
 				{
 					float yy = y > 0f ? y : (y < -down ? y + down : 0f);
-					if (x * x + yy * yy > (R + rr * 0.5f) * (R + rr * 0.5f)) continue;
-					if (g.PressGrass(c + new Vector3(x, y, 0f), rr, 1f)) n++;
+					if (x * x + yy * yy > R * R) continue;
+					_pts.Add(new Vector2(x, y));
 				}
-			if (_probeLog < 6 && n > 0) { _probeLog++; TLog.Info($"Tank grass press: {n} circles of {rr:0.##} over radius {R:0.##} + {down:0.##} down"); }
+			Vector2 mid = new Vector2(0f, -down * 0.35f);
+			_pts.Sort((a, b) => (a - mid).sqrMagnitude.CompareTo((b - mid).sqrMagnitude));
+			int n = 0;
+			foreach (Vector2 p in _pts)
+			{
+				if (n >= free) break;
+				if (g.PressGrass(c + new Vector3(p.x, p.y, 0f), rr, 1f)) n++;
+			}
+			if (_probeLog < 6 && n > 0) { _probeLog++; TLog.Info($"Tank grass press: {n} of {_pts.Count} circles of {rr:0.##} over radius {R:0.##} + {down:0.##} down"); }
 		}
 		catch (Exception e) { if (!_grassWarned) { _grassWarned = true; TLog.Warn("Tank grass press: " + e.Message); } }
 	}

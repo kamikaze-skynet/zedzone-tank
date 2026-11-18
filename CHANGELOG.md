@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.8
+
+- Grass push uses many small circles instead of one huge one (a huge circle only bent the grass a little near the tank). Circles of GrassPushCircle metres cover GrassPushArea around the tank plus GrassPushBelow under it, closest to the tank first, as many as the game's free slots allow. New config keys, so earlier values don't carry over.
+
 ## 1.5.7
 
 - Grass push actually covers the Battle Tank: the game refused one big grass circle, so the area (GrassPushRadius around the middle, stretched GrassPushDown below it) is now tiled with the biggest circle the game accepts, using the free grass-presser slots. Tank.log reports the circle size and count.

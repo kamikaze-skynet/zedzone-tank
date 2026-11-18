@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.5.7";
+	public const string Version = "1.5.8";
 
 	internal static ManualLogSource L;
 
@@ -35,7 +35,7 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<float> Model3DZoom;
 	internal static ConfigEntry<bool> DrawDiagnostics;
 	internal static ConfigEntry<bool> BaseEnabled, BasePressGrass, BaseGrassPermanent;
-	internal static ConfigEntry<float> BaseMass, BaseArmour, BaseTopSpeed, BaseTurn, BaseGrassPress, BaseGrassSouth;
+	internal static ConfigEntry<float> BaseMass, BaseArmour, BaseTopSpeed, BaseTurn, BaseGrassPress, BaseGrassSouth, BaseGrassPiece;
 	internal static ConfigEntry<int> Model3DPictureSize;
 	internal static ConfigEntry<float> Model3DNearClip;
 	internal static ConfigEntry<bool> Model3DFlip;
@@ -72,8 +72,9 @@ public class TankPlugin : BasePlugin
 		BaseArmour = Config.Bind("BattleTankBase", "Armour", 5f, "Battle Tank bodywork health compared with the pickup.");
 		BaseTopSpeed = Config.Bind("BattleTankBase", "TopSpeed", 0.8f, "Battle Tank top speed compared with the pickup.");
 		BaseTurn = Config.Bind("BattleTankBase", "TurnRate", 1f, "Battle Tank turning speed compared with the pickup.");
-		BaseGrassPress = Config.Bind("BattleTankBase", "GrassPushRadius", 2f, "How far around the Battle Tank grass is pushed down: a circle whose radius is this times half the hull length (1.1 just covers the hull; 2 covers the whole tank with a wide margin).");
-		BaseGrassSouth = Config.Bind("BattleTankBase", "GrassPushDown", 0.6f, "A second grass-push circle this far below the tank (times the hull length), because grass below the tank grows up the screen over it. 0 = off.");
+		BaseGrassPiece = Config.Bind("BattleTankBase", "GrassPushCircle", 1.8f, "Size (metres) of each small grass-push circle the area is covered with. Smaller = stronger push but more circles needed.");
+		BaseGrassPress = Config.Bind("BattleTankBase", "GrassPushArea", 1.3f, "How far around the Battle Tank grass is pushed down: a circle whose radius is this times half the hull length (1.1 just covers the hull; 2 covers the whole tank with a wide margin).");
+		BaseGrassSouth = Config.Bind("BattleTankBase", "GrassPushBelow", 0.5f, "A second grass-push circle this far below the tank (times the hull length), because grass below the tank grows up the screen over it. 0 = off.");
 		BasePressGrass = Config.Bind("BattleTankBase", "TankCrushesGrass", false, "The Battle Tank crushes the grass it drives over so tall grass doesn't cover it.");
 		BaseGrassPermanent = Config.Bind("BattleTankBase", "CrushGrassPermanent", false, "Crushed grass stays gone in the world save (tank trails). Off: it grows back after a reload.");
 		Model3DFlip = Config.Bind("BattleTank", "FlipModel", false, "Turn the 3D model around if it drives backwards.");
