@@ -70,6 +70,7 @@ internal static class TankBase
 			if (o.MaxSpeed > 0f && Mathf.Abs(v.maxLinearSpeed - o.SetMaxSpeed) > 0.001f) v.maxLinearSpeed = o.SetMaxSpeed;
 			if (o.MaxTurn > 0f && Mathf.Abs(v.maxAngularSpeed - o.SetMaxTurn) > 0.001f) v.maxAngularSpeed = o.SetMaxTurn;
 			PressGrass(v, col, o);
+			BigPress(v, col, o);
 			if (!o.Logged)
 			{
 				o.Logged = true;
@@ -121,6 +122,37 @@ internal static class TankBase
 			if (n > 0) g.FlushPendingVertexUploads();
 		}
 		catch (Exception e) { if (!_grassWarned) { _grassWarned = true; TLog.Warn("Tank base grass: " + e.Message); } }
+	}
+
+	private static int _bigLog;
+
+	// Like any other vehicle the tank pushes the grass down rather than cutting it, but over a
+	// bigger area: one extra presser over the tank's middle, sized from the hull length.
+	private static void BigPress(BasicVehicle v, CapsuleCollider2D col, Orig o)
+	{
+		float k = TankPlugin.BaseGrassPress.Value;
+		if (k <= 0f || col == null) return;
+		try
+		{
+			TerrainGrassController g = TerrainGrassController.instance;
+			if (g == null) return;
+			Transform t = col.transform;
+			float len = Mathf.Max(o.SetSize.x, o.SetSize.y);
+			Vector3 ls = t.lossyScale;
+			float r = len * 0.5f * k * Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.y));
+			Vector3 w = t.TransformPoint((Vector3)col.offset);
+			w.z = 0f;
+			int before = g.framePresserCount;
+			bool ok = g.PressGrass(w, r, 1f);
+			if (_bigLog < 3 || (!ok && _bigLog < 6))
+			{
+				_bigLog++;
+				int cap = -1;
+				try { cap = g.framePressers != null ? g.framePressers.Length : -1; } catch { }
+				TLog.Info($"Tank grass press at {w} radius {r:0.##}: {(ok ? "ok" : "refused")}, pressers this frame {before} of {cap}");
+			}
+		}
+		catch (Exception e) { if (!_grassWarned) { _grassWarned = true; TLog.Warn("Tank grass press: " + e.Message); } }
 	}
 
 	internal static void Forget(BasicVehicle v)

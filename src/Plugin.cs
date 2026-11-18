@@ -35,7 +35,7 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<float> Model3DZoom;
 	internal static ConfigEntry<bool> DrawDiagnostics;
 	internal static ConfigEntry<bool> BaseEnabled, BasePressGrass, BaseGrassPermanent;
-	internal static ConfigEntry<float> BaseMass, BaseArmour, BaseTopSpeed, BaseTurn;
+	internal static ConfigEntry<float> BaseMass, BaseArmour, BaseTopSpeed, BaseTurn, BaseGrassPress;
 	internal static ConfigEntry<int> Model3DPictureSize;
 	internal static ConfigEntry<float> Model3DNearClip;
 	internal static ConfigEntry<bool> Model3DFlip;
@@ -62,9 +62,9 @@ public class TankPlugin : BasePlugin
 		NearbyRadius = Config.Bind("General", "NearbyRadius", 30f, new ConfigDescription("You can't call another tank while one is parked this close (tiles).", new AcceptableValueRange<float>(0f, 500f)));
 		StartFuel = Config.Bind("General", "StartFuel", 0.5f, new ConfigDescription("How full a new tank's fuel tank is (0 to 1).", new AcceptableValueRange<float>(0f, 1f)));
 		TankScale = Config.Bind("Look", "Scale", 1.1f, new ConfigDescription("Size of the tank's art.", new AcceptableValueRange<float>(0.5f, 3f)));
-		Model3DSize = Config.Bind("BattleTank", "Size", 1.6f, "Battle Tank (3D model) hull length compared with the base car's length.");
-		Model3DZoom = Config.Bind("BattleTank", "CameraZoomOut", 2.8f, "How far the car camera zooms out for the Battle Tank so its long gun isn't cut off (the picture is enlarged by the same amount, so the tank keeps its size).");
-		Model3DPictureSize = Config.Bind("BattleTank", "PictureSize", 1024, "Pixel size of the picture the car camera films the Battle Tank into (the game uses 256 for cars; the tank is zoomed out, so it needs more to stay sharp). 0 keeps the game's picture.");
+		Model3DSize = Config.Bind("BattleTank", "Size", 1.25f, "Battle Tank (3D model) hull length compared with the base car's length.");
+		Model3DZoom = Config.Bind("BattleTank", "CameraZoomOut", 2.2f, "How far the car camera zooms out for the Battle Tank so its long gun isn't cut off (the picture is enlarged by the same amount, so the tank keeps its size).");
+		Model3DPictureSize = Config.Bind("BattleTank", "PictureSize", 768, "Pixel size of the picture the car camera films the Battle Tank into (the game uses 256 for cars; the tank is zoomed out, so it needs more to stay sharp). 0 keeps the game's picture.");
 		Model3DNearClip = Config.Bind("BattleTank", "CameraNearClip", 12f, "How far in front of the car camera the Battle Tank may reach before it is cut off (the camera is orthographic, so this can reach behind it).");
 		DrawDiagnostics = Config.Bind("Debug", "DrawDiagnostics", true, "Write how the Battle Tank is drawn (car camera, its picture, the quad on the map, every renderer) to Tank.log a few times after it appears.");
 		BaseEnabled = Config.Bind("BattleTankBase", "Enabled", true, "Make the pickup under a Battle Tank into a tank of its own: hit box the size of the tank, heavier, more armour, tank handling.");
@@ -72,6 +72,7 @@ public class TankPlugin : BasePlugin
 		BaseArmour = Config.Bind("BattleTankBase", "Armour", 5f, "Battle Tank bodywork health compared with the pickup.");
 		BaseTopSpeed = Config.Bind("BattleTankBase", "TopSpeed", 0.8f, "Battle Tank top speed compared with the pickup.");
 		BaseTurn = Config.Bind("BattleTankBase", "TurnRate", 1f, "Battle Tank turning speed compared with the pickup.");
+		BaseGrassPress = Config.Bind("BattleTankBase", "GrassPushSize", 1.4f, "How far around the Battle Tank grass is pushed down, as a circle whose radius is this times half the hull length (1.1 just covers the hull corners; 1.4 covers the whole tank and a margin around it). 0 = only the game's normal car pressing.");
 		BasePressGrass = Config.Bind("BattleTankBase", "TankCrushesGrass", false, "The Battle Tank crushes the grass it drives over so tall grass doesn't cover it.");
 		BaseGrassPermanent = Config.Bind("BattleTankBase", "CrushGrassPermanent", false, "Crushed grass stays gone in the world save (tank trails). Off: it grows back after a reload.");
 		Model3DFlip = Config.Bind("BattleTank", "FlipModel", false, "Turn the 3D model around if it drives backwards.");

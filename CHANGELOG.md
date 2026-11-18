@@ -2,7 +2,7 @@
 
 ## 1.5.5
 
-- Battle Tank is bigger: default size 1.6x the base car's length (was 1.25), with the car camera zoomed out to 2.8 and a 1024 px picture so it still fits and stays sharp. The hit box grows with it. Existing configs keep their own BattleTank.Size, CameraZoomOut and PictureSize.
+- The Battle Tank pushes grass down over a bigger area: an extra grass presser over the tank's middle, covering the whole tank and a margin around it (BattleTankBase.GrassPushSize, default 1.4). Grass is pushed down, not cut, like any other vehicle. Tank.log prints the first few 'Tank grass press' lines.
 
 ## 1.5.4
 
