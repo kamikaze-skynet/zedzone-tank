@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.6.3";
+	public const string Version = "1.6.4";
 
 	internal static ManualLogSource L;
 

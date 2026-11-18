@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.4
+
+- Tank start-up, idle and moving sounds are louder (about +5 dB, gently limited).
+
 ## 1.6.3
 
 - New moving sound: a Leopard 2A4 driving loop.
