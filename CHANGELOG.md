@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.13
+
+- Trees, bushes and buildings in front of the Battle Tank draw over it again. The tank now sits just above the tall grass instead of above everything, and objects standing in front of it that overlap its picture are lifted just above it while they do (BattleTank.SortWithTrees, on).
+
 ## 1.5.12
 
 - Battle Tank picture is shown on its own quad like the classic tank's sprites (Default layer, outside the game's VehicleParent), and the game's car quad is switched off. 1.5.11's log showed the picture was fully solid, lifted above the grass and sorted after it, yet still covered, so the game's car quad itself is what grass draws over.

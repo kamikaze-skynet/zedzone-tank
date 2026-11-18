@@ -47,6 +47,8 @@ internal static class Model3D
 		public RenderTexture Pic;
 		public MeshRenderer Copy;
 		public bool CopyFailed;
+		public float FrontAt;
+		public readonly Dictionary<IntPtr, Raised> Raised = new Dictionary<IntPtr, Raised>();
 		public float NearSet = float.NaN;
 		public float NextDiag = -1f;
 		public int Diags;
@@ -632,6 +634,7 @@ internal static class Model3D
 		{
 			try { if (s.Pivot != null) Object.Destroy(s.Pivot); } catch { }
 			try { if (s.Copy != null) Object.Destroy(s.Copy.gameObject); } catch { }
+			RestoreFront(s, null);
 			_st.Remove(v);
 		}
 	}
@@ -724,6 +727,69 @@ internal static class Model3D
 		catch (Exception e) { if (!s.CopyFailed) { s.CopyFailed = true; TLog.Warn("tank picture quad: " + e.Message); } }
 	}
 
+	internal class Raised { public TerrainObject Obj; public Renderer R; public SortingGroup G; public int Layer, Order; }
+	private static bool _frontLogged;
+
+	// Trees, bushes and buildings standing in front of (south of) the tank draw over it, like they
+	// do over the game's cars: those that overlap the tank picture are lifted just above the tank.
+	private static void FrontObjects(BasicVehicle v, State s, int sl, int ord)
+	{
+		float now = Time.realtimeSinceStartup;
+		if (now < s.FrontAt || s.Copy == null) return;
+		s.FrontAt = now + 0.2f;
+		try
+		{
+			Bounds tb = s.Copy.bounds;
+			float ty = v.transform.position.y;
+			var keep = new HashSet<IntPtr>();
+			var hits = Physics2D.OverlapCircleAll(new Vector2(tb.center.x, tb.center.y), Mathf.Max(tb.extents.x, tb.extents.y) + 4f);
+			var sb = _frontLogged ? null : new System.Text.StringBuilder($"Front objects near the tank ({hits.Length} colliders):");
+			foreach (Collider2D h in hits)
+			{
+				if (h == null) continue;
+				TerrainObject o = h.GetComponentInParent<TerrainObject>();
+				if (o == null || keep.Contains(o.Pointer)) continue;
+				SpriteRenderer sr = o.spriteRenderer;
+				if (sr == null) continue;
+				SortingGroup g = o.m_sortingGroup;
+				if (g != null && !g.enabled) g = null;
+				Bounds ob = sr.bounds;
+				bool front = o.transform.position.y < ty;
+				bool over = ob.min.x < tb.max.x && ob.max.x > tb.min.x && ob.min.y < tb.max.y && ob.max.y > tb.min.y;
+				if (sb != null && sb.Length < 1500) sb.Append($" {o.name} y {o.transform.position.y - ty:0.#} front {front} over {over} sorting '{(g != null ? SortingLayer.IDToName(g.sortingLayerID) : sr.sortingLayerName)}'/{(g != null ? g.sortingOrder : sr.sortingOrder)}{(g != null ? " (group)" : "")};");
+				if (!front || !over) continue;
+				keep.Add(o.Pointer);
+				if (!s.Raised.ContainsKey(o.Pointer))
+					s.Raised[o.Pointer] = new Raised { Obj = o, R = sr, G = g, Layer = g != null ? g.sortingLayerID : sr.sortingLayerID, Order = g != null ? g.sortingOrder : sr.sortingOrder };
+				if (g != null) { if (g.sortingLayerID != sl) g.sortingLayerID = sl; if (g.sortingOrder != ord + 1) g.sortingOrder = ord + 1; }
+				else { if (sr.sortingLayerID != sl) sr.sortingLayerID = sl; if (sr.sortingOrder != ord + 1) sr.sortingOrder = ord + 1; }
+			}
+			if (sb != null && hits.Length > 0) { TLog.Info(sb.ToString()); _frontLogged = true; }
+			RestoreFront(s, keep);
+		}
+		catch (Exception e) { if (!_frontLogged) { _frontLogged = true; TLog.Warn("front objects: " + e.Message); } }
+	}
+
+	private static void RestoreFront(State s, HashSet<IntPtr> keep)
+	{
+		var _raised = s.Raised;
+		if (_raised.Count == 0) return;
+		var gone = new List<IntPtr>();
+		foreach (var kv in _raised)
+		{
+			if (keep != null && keep.Contains(kv.Key)) continue;
+			gone.Add(kv.Key);
+			Raised r = kv.Value;
+			try
+			{
+				if (r.G != null) { r.G.sortingLayerID = r.Layer; r.G.sortingOrder = r.Order; }
+				else if (r.R != null) { r.R.sortingLayerID = r.Layer; r.R.sortingOrder = r.Order; }
+			}
+			catch { }
+		}
+		foreach (IntPtr k in gone) _raised.Remove(k);
+	}
+
 	// lowest layer the car camera films
 	private static int CamLayer(Camera c)
 	{
@@ -768,9 +834,11 @@ internal static class Model3D
 				Renderer qr = v.vehicleQuadRenderer;
 				if (qr != null)
 				{
-					int sl = Tank.SortLayer, ord = TankPlugin.SortingOrder.Value;
+					// just above the tall grass (not far above everything), so trees can go above it
+					int sl = Tank.SortLayer, ord = TankPlugin.Model3DAboveGrassOnly.Value ? 0 : TankPlugin.SortingOrder.Value;
 					GrassSort(ref sl, ref ord);
 					OwnQuad(v, s, qr, sl, ord);
+					if (TankPlugin.Model3DAboveGrassOnly.Value) FrontObjects(v, s, sl, ord);
 				}
 			}
 			int want = TankPlugin.Model3DPictureSize.Value;
