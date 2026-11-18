@@ -122,6 +122,29 @@ internal static class BuildMenu
 		catch (Exception e) { if (!_logged) { _logged = true; TLog.Warn("Build menu: " + e.Message); } }
 	}
 
+	// The menu fills in card and detail icons after our patches run, so keep ours on screen while it's open.
+	internal static void Tick()
+	{
+		if (!On || _icon == null && Icon() == null) return;
+		try
+		{
+			ConstructionPanel p = ConstructionPanel._instance;
+			if (p == null || !p.built || p.windowRT == null || !p.windowRT.gameObject.activeInHierarchy) return;
+			var cards = p.cards;
+			if (cards != null)
+				for (int i = 0; i < cards.Count; i++)
+				{
+					var c = cards[i];
+					if (c == null || c.isVoxelCard || c.terrainObjectId != AttrId || c.iconImage == null) continue;
+					if (c.iconImage.sprite == null || c.iconImage.sprite.Pointer != _icon.Pointer) { c.iconImage.sprite = _icon; c.iconImage.preserveAspect = true; }
+				}
+			if (p.selectedId == AttrId && !p.voxelTabSelected && p.detailIcon != null && (p.detailIcon.sprite == null || p.detailIcon.sprite.Pointer != _icon.Pointer))
+			{ p.detailIcon.sprite = _icon; p.detailIcon.preserveAspect = true; }
+		}
+		catch (Exception e) { if (!_tickWarned) { _tickWarned = true; TLog.Warn("Build menu icon: " + e.Message); } }
+	}
+	private static bool _tickWarned;
+
 	internal static bool Afford(HumanCharacterController pc, out string missing)
 	{
 		missing = null;

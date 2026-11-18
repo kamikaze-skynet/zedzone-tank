@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.7.0";
+	public const string Version = "1.7.1";
 
 	internal static ManualLogSource L;
 
@@ -175,6 +175,7 @@ public class TankRunner : MonoBehaviour
 		if (Time.frameCount % 120 == 0) { try { var im = ItemManager.instance; if (im != null && im.itemList != null && im.itemList.Count > 0) Bundled.LoadMissing("late"); } catch { } }
 		Active = TankPlugin.Enabled.Value;
 		if (!Active) return;
+		try { BuildMenu.Tick(); } catch { }
 		try { Tank.Tick(Time.deltaTime); }
 		catch (Exception e) { TLog.Warn("tick: " + e.Message); }
 	}
