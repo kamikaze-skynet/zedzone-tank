@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.4
+
+- Battle Tank: materials are forced to draw solid (opaque queue, depth writes, no alpha blending) and the mesh gets solid white vertex colours, so parts no longer show through each other.
+
 ## 1.4.3
 
 - Battle Tank: the car shader's spray-paint layer now gets a fully transparent texture. Left empty, it read as solid white and washed the whole tank out.

@@ -213,7 +213,13 @@ internal static class Model3D
 		bool haveN = norms.Count == verts.Count && norms.TrueForAll(n => n.sqrMagnitude > 0.01f);
 		if (haveN) m.normals = norms.ToArray();
 		if (tc.Count > 0) m.uv = uvs.ToArray();
-		else m.RecalculateNormals();
+		if (!haveN) m.RecalculateNormals();
+		{
+			// solid white vertex colours, in case the shader reads them as tint or alpha
+			var col = new Color32[verts.Count];
+			for (int i = 0; i < col.Length; i++) col[i] = new Color32(255, 255, 255, 255);
+			m.colors32 = col;
+		}
 		m.RecalculateBounds();
 		var p = new Part { Mesh = m };
 		p.Mats.AddRange(order);
@@ -348,6 +354,22 @@ internal static class Model3D
 					if (m.HasProperty(prop)) m.SetTexture(prop, paint);
 			}
 			try { m.mainTexture = paint; } catch { }
+			// draw as a solid, depth-writing object so parts don't show through each other
+			int q0 = m.renderQueue;
+			try
+			{
+				if (m.HasProperty("_QueueOffset")) m.SetFloat("_QueueOffset", 0f);
+				foreach (string kw in new[] { "_SURFACE_TYPE_TRANSPARENT", "_ALPHABLEND_ON", "_ALPHAPREMULTIPLY_ON", "_BLENDMODE_ALPHA" })
+					m.DisableKeyword(kw);
+				if (m.HasProperty("_Surface")) m.SetFloat("_Surface", 0f);
+				if (m.HasProperty("_ZWrite")) m.SetFloat("_ZWrite", 1f);
+				if (m.HasProperty("_SrcBlend")) m.SetFloat("_SrcBlend", 1f);
+				if (m.HasProperty("_DstBlend")) m.SetFloat("_DstBlend", 0f);
+				m.SetOverrideTag("RenderType", "Opaque");
+				m.renderQueue = 2000;
+			}
+			catch (Exception e) { log.Append(" opaque failed: ").Append(e.Message); }
+			if (!_propsLogged) log.Append(" queue ").Append(q0).Append(" -> ").Append(m.renderQueue).Append(", keywords ").Append(string.Join(",", m.shaderKeywords));
 			if (!_propsLogged) { _propsLogged = true; TLog.Info("3D model shader '" + m.shader.name + "' properties: " + log); }
 			m.name = "zt_" + p.Mats[i];
 			list[i] = m;
