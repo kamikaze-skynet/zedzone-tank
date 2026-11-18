@@ -36,6 +36,29 @@ def make_copy(o, coll):
     me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), preserve_all_data_layers=True, depsgraph=dg)
     if mod: o.modifiers.remove(mod)
     me.transform(o.matrix_world)
+    # Procedural paint must bake to what the viewport shows. Two things differ on the game copy:
+    #  - Object coordinates would become the joined object's, so each source object gets its own
+    #    material copy with its Texture Coordinate nodes pinned to itself;
+    #  - Pointiness (edge wear) comes from the mesh's curvature, and on decimated meshes the edge
+    #    values smear across big flat triangles, washing whole skirt panels out. The viewport
+    #    (EEVEE) has no pointiness and uses 0.5, so the copy uses 0.5 too.
+    for i, m in enumerate(me.materials):
+        if not textured(m): continue
+        nodes = m.node_tree.nodes
+        tcs = [n for n in nodes if n.type == 'TEX_COORD' and n.object is None]
+        pts = [l for l in m.node_tree.links if l.from_node.type == 'NEW_GEOMETRY' and l.from_socket.name == 'Pointiness']
+        if not tcs and not pts: continue
+        cname = "GAME_" + m.name + "@" + o.name
+        cm = bpy.data.materials.get(cname)
+        if cm is None:
+            cm = m.copy(); cm.name = cname
+            nt = cm.node_tree
+            for n in nt.nodes:
+                if n.type == 'TEX_COORD' and n.object is None: n.object = o
+            for l in [l for l in nt.links if l.from_node.type == 'NEW_GEOMETRY' and l.from_socket.name == 'Pointiness']:
+                val = nt.nodes.new("ShaderNodeValue"); val.outputs[0].default_value = 0.5
+                to = l.to_socket; nt.links.remove(l); nt.links.new(val.outputs[0], to)
+        me.materials[i] = cm
     c = bpy.data.objects.new("GAME_part_" + o.name, me)
     coll.objects.link(c)
     return c
@@ -45,7 +68,8 @@ def join(parts, name, offset):
     with bpy.context.temp_override(active_object=keep, selected_editable_objects=parts, object=keep):
         bpy.ops.object.join()
     keep.name = name; keep.data.name = name
-    keep.data.transform(Matrix.Translation(-offset))
+    # paint uses world position (camo, height dust), so the origin shift waits until after the bake
+    keep["game_offset"] = tuple(offset)
     return keep
 
 def phase_a():
@@ -57,6 +81,8 @@ def phase_a():
         coll = bpy.data.collections.new("Game Export"); sc.collection.children.link(coll)
     lc = bpy.context.view_layer.layer_collection.children.get("Game Export")
     if lc: lc.exclude = False
+    for m in [m for m in bpy.data.materials if m.name.startswith("GAME_") and "@" in m.name]:
+        bpy.data.materials.remove(m)
     hull, turret = visible_meshes()
     hp = [make_copy(o, coll) for o in hull]
     tp = [make_copy(o, coll) for o in turret]
@@ -127,6 +153,8 @@ def phase_b():
 def phase_c():
     for name, file in (("GAME_Hull", "tank_hull"), ("GAME_Turret", "tank_turret")):
         o = bpy.data.objects[name]
+        if "game_offset" in o:
+            o.data.transform(Matrix.Translation(-Vector(o["game_offset"]))); del o["game_offset"]
         for ob in bpy.context.view_layer.objects: ob.select_set(False)
         o.select_set(True); bpy.context.view_layer.objects.active = o
         bpy.ops.wm.obj_export(filepath=os.path.join(OUT, file + ".obj"), export_selected_objects=True,

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.9
+
+- Battle Tank side skirts (and other big flat panels) now show the full camo. The bake read edge wear from the simplified game mesh, where it smeared across whole panels and turned them pale grey; the bake now uses the same flat wear value as the Blender viewport. Turret paint is also baked at its real height, so it gets the same dust as in Blender.
+
 ## 1.4.8
 
 - Battle Tank no longer leans: when the tank was called in while its base car was still settling, the tyres gave a tilted frame and the 3D model stayed tilted about 35 degrees inside the car picture. The model now always sits upright and faces straight along the car.
