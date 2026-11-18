@@ -21,7 +21,7 @@ internal static class TankAudio
 		if (t.Contains("flame") || t.Contains("laser") || t.Contains("water") || t.Contains("nail") || t.Contains("air") || t.Contains("bb ")
 			|| t.Contains("loop") || t.Contains("grenade") || t.Contains("rocket") || t.Contains("taser") || t.Contains("spray") || t.Contains("foam")) return -1;
 		if (t.Contains("pistol") || t.Contains("shotgun") || t.Contains("bow") || t.Contains("flare") || t.Contains("launcher") || t.Contains("revolver") || t.Contains("recoilless")) return 0;
-		if (t.Contains("m249") || t.Contains("machine gun") || t.Contains("machinegun") || t.Contains("lmg") || t.Contains("m60") || t.Contains("pkm") || t.Contains("rpk") || t.Contains("minigun")) return 5;
+		if (t.Contains("m249") || t.Contains("machine gun") || t.Contains("machinegun") || t.Contains("lmg") || t.Contains("m60") || t.Contains("pkm") || t.Contains("rpk") || t.Contains("minigun")) return 7;
 		if (t.Contains(".50") || t.Contains("50bmg") || t.Contains("browning")) return 4;
 		if (t.Contains(" mg") || t.Contains("_mg")) return 3;
 		if (t.Contains("ak") || t.Contains("m4") || t.Contains("rifle") || t.Contains("5.56") || t.Contains("7.62")) return 2;
@@ -101,7 +101,40 @@ internal static class TankAudio
 		catch (Exception e) { TLog.Warn("sound: " + e.Message); }
 	}
 
-	public static void Mg(Vector2 at) => Play(Mg(), at, 0.7f);
+	// The game's PlayAt skips a clip that is still sounding from a moment ago, so a held trigger
+	// only got the odd shot. The roof gun plays through its own game audio source instead, where
+	// every round starts its own copy of the clip and they overlap like a real machine gun.
+	private static AudioSource _mgSrc;
+	private static bool _mgSrcWarned;
+
+	public static void Mg(Vector2 at)
+	{
+		AudioClip c = Mg();
+		if (c == null) return;
+		try
+		{
+			if (_mgSrc == null)
+			{
+				_mgSrc = AudioController.instance?.CreatePersistentAudioSource();
+				if (_mgSrc != null)
+				{
+					_mgSrc.playOnAwake = false;
+					_mgSrc.loop = false;
+					_mgSrc.volume = 1f;
+					TLog.Info($"Audio: machine gun source spatial {_mgSrc.spatialBlend:0.##}, mixer {(_mgSrc.outputAudioMixerGroup != null ? _mgSrc.outputAudioMixerGroup.name : "none")}");
+				}
+			}
+			if (_mgSrc != null)
+			{
+				_mgSrc.transform.position = new Vector3(at.x, at.y, 0f);
+				_mgSrc.pitch = Random.Range(0.96f, 1.04f);
+				_mgSrc.PlayOneShot(c, 0.7f * Vol);
+				return;
+			}
+		}
+		catch (Exception e) { if (!_mgSrcWarned) { _mgSrcWarned = true; TLog.Warn("mg sound source: " + e.Message); } }
+		Play(c, at, 0.7f);
+	}
 
 	public static void Cannon(Vector2 at) => Play(Cannon(), at, 1f);
 }

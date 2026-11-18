@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.4
+
+- Machine gun sound keeps up with a held trigger: every round now plays its own overlapping copy of the clip through a game audio source (the game's PlayAt skipped a clip that was still sounding, so only the odd shot was heard).
+- The automatic sound pick prefers a real machine gun (M249 and the like) over submachine guns.
+
 ## 1.5.3
 
 - Grass works like it does for any other vehicle: the Battle Tank no longer crushes grass by default (new setting BattleTankBase.TankCrushesGrass, off by default; the old CrushGrass setting is no longer read). Instead the tank's vehicle size is set to the tank's footprint, which the game uses for a car's grass pressing, path footprint and body checks.
