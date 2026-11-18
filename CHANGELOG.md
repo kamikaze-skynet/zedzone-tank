@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.5
+
+- Draw diagnostics for the Battle Tank (config Debug.DrawDiagnostics, on by default). A few times after the tank appears, Tank.log gets a 'Draw check' block: the car camera (clear mode, background, layers, clip range, render target format), whether the tank sits inside the camera's clip range, the quad that shows the car on the map with all its material settings, every renderer on the car, and all cameras.
+
 ## 1.4.4
 
 - Battle Tank: materials are forced to draw solid (opaque queue, depth writes, no alpha blending) and the mesh gets solid white vertex colours, so parts no longer show through each other.

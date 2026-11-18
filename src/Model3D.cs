@@ -44,6 +44,8 @@ internal static class Model3D
 		public float YawSign = -1f;
 		public bool Failed;
 		public float NextHide;
+		public float NextDiag = -1f;
+		public int Diags;
 		public readonly List<Renderer> Hidden = new List<Renderer>();
 		public readonly HashSet<IntPtr> Ours = new HashSet<IntPtr>();
 	}
@@ -503,6 +505,11 @@ internal static class Model3D
 		if (s.Failed) return false;
 		if (s.Pivot == null) return false;
 		HideBody(v, s, now);
+		if (TankPlugin.DrawDiagnostics.Value && s.Diags < 4)
+		{
+			if (s.NextDiag < 0f) s.NextDiag = now + 2f;
+			else if (now >= s.NextDiag) { s.NextDiag = now + 15f; s.Diags++; Diag(v, s, s.Diags); }
+		}
 		float k = Mathf.Max(1f, TankPlugin.Model3DZoom.Value);
 		// Zoom the car camera out (and grow its quad by the same amount) so the long gun fits.
 		// If the game changes either value itself, that becomes the new base.
@@ -604,5 +611,119 @@ internal static class Model3D
 			try { if (s.Pivot != null) Object.Destroy(s.Pivot); } catch { }
 			_st.Remove(v);
 		}
+	}
+
+	// ------------------------------------------------------------------ draw diagnostics
+
+	private static string Mat(Material m)
+	{
+		if (m == null) return "null";
+		var b = new System.Text.StringBuilder();
+		b.Append('\'').Append(m.name).Append("' shader '").Append(m.shader != null ? m.shader.name : "?").Append("' queue ").Append(m.renderQueue);
+		try { b.Append(" keywords [").Append(string.Join(",", m.shaderKeywords)).Append(']'); } catch { }
+		try { b.Append(" RenderType=").Append(m.GetTag("RenderType", false, "-")).Append(" Queue=").Append(m.GetTag("Queue", false, "-")); } catch { }
+		try
+		{
+			Shader sh = m.shader;
+			int n = sh.GetPropertyCount();
+			for (int k = 0; k < n; k++)
+			{
+				string prop = sh.GetPropertyName(k);
+				if (prop.StartsWith("unity_")) continue;
+				ShaderPropertyType ty = sh.GetPropertyType(k);
+				b.Append("\n      ").Append(prop).Append(" = ");
+				switch (ty)
+				{
+					case ShaderPropertyType.Texture:
+						Texture t = m.GetTexture(prop);
+						b.Append(t == null ? "null" : $"'{t.name}' {t.width}x{t.height} {t.GetType().Name}");
+						var rt = t != null ? t.TryCast<RenderTexture>() : null;
+						if (rt != null) b.Append($" fmt {rt.format} depth {rt.depth} aa {rt.antiAliasing}");
+						break;
+					case ShaderPropertyType.Color: b.Append(m.GetColor(prop)); break;
+					case ShaderPropertyType.Vector: b.Append(m.GetVector(prop)); break;
+					default: b.Append(m.GetFloat(prop).ToString("0.###", CultureInfo.InvariantCulture)); break;
+				}
+			}
+		}
+		catch (Exception e) { b.Append(" (props: ").Append(e.Message).Append(')'); }
+		return b.ToString();
+	}
+
+	private static string Rend(Renderer r)
+	{
+		if (r == null) return "null";
+		var b = new System.Text.StringBuilder();
+		b.Append($"'{Path(r.transform)}' {r.GetType().Name} enabled {r.enabled} active {r.gameObject.activeInHierarchy} layer {r.gameObject.layer} ({LayerMask.LayerToName(r.gameObject.layer)})");
+		try { b.Append($" sorting '{r.sortingLayerName}'/{r.sortingOrder}"); } catch { }
+		try { b.Append($" bounds c {r.bounds.center} size {r.bounds.size}"); } catch { }
+		return b.ToString();
+	}
+
+	/// <summary>Logs how the car is drawn: its camera, the picture it renders into, the quad that
+	/// shows that picture on the map, and every renderer on the car. For see-through problems.</summary>
+	private static void Diag(BasicVehicle v, State s, int n)
+	{
+		var b = new System.Text.StringBuilder();
+		b.Append($"Draw check {n}:");
+		try
+		{
+			Camera c = s.Cam;
+			if (c == null) b.Append("\n  camera: none");
+			else
+			{
+				b.Append($"\n  camera '{Path(c.transform)}' enabled {c.enabled} clear {c.clearFlags} background {c.backgroundColor} mask {c.cullingMask} ({Layers(c.cullingMask)})");
+				b.Append($"\n    ortho {c.orthographic} size {c.orthographicSize:0.###} near {c.nearClipPlane:0.###} far {c.farClipPlane:0.###} depth {c.depth} hdr {c.allowHDR} msaa {c.allowMSAA}");
+				Vector3 lp = s.Pivot != null ? c.transform.InverseTransformPoint(s.Pivot.transform.position) : Vector3.zero;
+				b.Append($"\n    tank pivot in camera space {lp} (z must be between near and far)");
+				RenderTexture rt = c.targetTexture;
+				if (rt == null) b.Append("\n    target: screen");
+				else b.Append($"\n    target '{rt.name}' {rt.width}x{rt.height} fmt {rt.format} depth {rt.depth} aa {rt.antiAliasing} sRGB {rt.sRGB}");
+				foreach (Renderer r in new[] { s.Hull != null ? s.Hull.GetComponent<Renderer>() : null, s.Turret != null ? s.Turret.GetComponent<Renderer>() : null })
+				{
+					if (r == null) continue;
+					Bounds bb = r.bounds;
+					Vector3 a = c.transform.InverseTransformPoint(bb.min), z = c.transform.InverseTransformPoint(bb.max);
+					b.Append($"\n    {r.name} camera-space z {Mathf.Min(a.z, z.z):0.##}..{Mathf.Max(a.z, z.z):0.##}, in camera mask {((c.cullingMask >> r.gameObject.layer) & 1) == 1}");
+				}
+			}
+		}
+		catch (Exception e) { b.Append("\n  camera error: ").Append(e.Message); }
+		try
+		{
+			Renderer q = v.vehicleQuadRenderer;
+			b.Append("\n  quad ").Append(Rend(q));
+			if (q != null) foreach (Material m in q.sharedMaterials) b.Append("\n    material ").Append(Mat(m));
+		}
+		catch (Exception e) { b.Append("\n  quad error: ").Append(e.Message); }
+		try
+		{
+			Transform root = v.transform;
+			b.Append($"\n  renderers under '{Path(root)}':");
+			foreach (Renderer r in root.GetComponentsInChildren<Renderer>(true))
+			{
+				bool ours = s.Ours.Contains(r.Pointer);
+				b.Append("\n   ").Append(ours ? "[tank] " : "").Append(Rend(r));
+				if (ours && n == 1) foreach (Material m in r.sharedMaterials) { b.Append("\n    material ").Append(Mat(m)); break; }
+				else if (!ours && r.enabled) { Material m = r.sharedMaterial; if (m != null) b.Append($" material '{m.name}' ({(m.shader != null ? m.shader.name : "?")}) queue {m.renderQueue}"); }
+			}
+		}
+		catch (Exception e) { b.Append("\n  renderer list error: ").Append(e.Message); }
+		try
+		{
+			b.Append("\n  cameras:");
+			foreach (Camera c in Camera.allCameras)
+				b.Append($"\n    '{Path(c.transform)}' depth {c.depth} mask {Layers(c.cullingMask)} target {(c.targetTexture != null ? c.targetTexture.name : "screen")}");
+		}
+		catch (Exception e) { b.Append("\n  camera list error: ").Append(e.Message); }
+		TLog.Info(b.ToString());
+	}
+
+	private static string Layers(int mask)
+	{
+		if (mask == -1) return "everything";
+		var l = new List<string>();
+		for (int i = 0; i < 32; i++) if (((mask >> i) & 1) == 1) { string nm = LayerMask.LayerToName(i); l.Add(i + (string.IsNullOrEmpty(nm) ? "" : ":" + nm)); }
+		return string.Join(",", l);
 	}
 }
