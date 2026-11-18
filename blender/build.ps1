@@ -12,7 +12,7 @@ if (-not $Blender) {
     $Blender = $found.FullName
 }
 Write-Host "==> Building the 3D model with $Blender" -ForegroundColor Cyan
-& $Blender -b -P blender\build_tank.py
+& $Blender -b -P blender\build_abrams.py
 if ($LASTEXITCODE -ne 0) { throw "Blender failed" }
 Write-Host "==> Item mods (needs Python with Pillow: pip install pillow)" -ForegroundColor Cyan
 python art-src\build_items.py

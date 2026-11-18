@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.0
+- The Battle Tank is now the **Desert Sentinel**, a far more detailed M1-style tank modelled in Blender: angled wedge turret with a gun slot and round mantlet, commander's cupola with six vision blocks and a detailed .50 cal on an armoured cradle, loader's M240 on a swing arm, gunner's sight with open ballistic doors, thermal viewer on a pedestal, flat deck with a short glacis, headlight clusters, tow clevises and shackles, stowed tow cables, full-height side skirts with armour tiles, bustle rack with jerry cans and a spare road wheel.
+- Its camouflage is now painted on: the model carries baked paint textures instead of flat colours (the mod loads UVs and `map_Kd` textures from the model files).
+- The roof machine gun now fires from the .50 cal's muzzle, and the main gun from the new barrel's tip.
+- The model files are stored compressed, so the DLL stays around 9 MB.
+
 ## 1.3.1
 - Battle Tank model rebuilt with far more detail (about 48,000 triangles, was 6,500): individual track links with guide horns, paired road wheels with hub bolts, toothed sprockets, spoked idlers, bolted skirts, louvred engine deck, tow cables, periscopes, commander's cupola with vision blocks, gun bellows and sleeve bands, smoke launchers, loaded stowage basket. Smooth shading now carries into the game.
 

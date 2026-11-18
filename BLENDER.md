@@ -6,7 +6,8 @@ hull and turret meshes, so the game's camera and lighting draw it, and the turre
 
 | File | What it is |
 |---|---|
-| `blender/build_tank.py` | Builds the whole tank in Blender from code and exports it |
+| `blender/build_abrams.py` | Builds the Battle Tank (M1A1 Abrams-style) in Blender from code and exports it |
+| `blender/build_tank.py` | The first, generic tank design (kept for reference; its turret sits 2.0 m up, so it needs `TurretPivot` changed back in `src/Model3D.cs`) |
 | `blender/out/tank_model.blend` | The finished scene (open it in Blender to look around) |
 | `blender/out/preview_*.png` | Renders |
 | `src/model3d/tank_hull.obj`, `tank_turret.obj` (+ `.mtl`) | What the plugin loads (embedded in Tank.dll) |
@@ -14,7 +15,7 @@ hull and turret meshes, so the game's camera and lighting draw it, and the turre
 
 Model rules the plugin relies on: metres, +X is the front, +Z is up. The hull's origin is the
 ground point under the turret ring; the turret's origin is the ring centre at deck height (the
-plugin puts it 2.0 m up). The barrel tip is about 7.75 m in front of the ring. Colours come from
+plugin puts it 1.72 m up, `TurretPivot` in `src/Model3D.cs`). The barrel tip is about 7.7 m in front of the ring. Colours come from
 the material colours (Base Color), one material per colour.
 
 ## 1. Set up Blender on your PC
@@ -40,8 +41,8 @@ When you're done, export each one on its own:
 3. Save as `src\model3d\tank_hull.obj` (or `tank_turret.obj`).
 4. Build: `dotnet build src\Tank.csproj -c Release`.
 
-Running `build.ps1` again rebuilds from `build_tank.py` and overwrites hand edits, so either keep
-editing by hand, or change `build_tank.py` (the better way when Claude does the work).
+Running `build.ps1` again rebuilds from `build_abrams.py` and overwrites hand edits, so either keep
+editing by hand, or change `build_abrams.py` (the better way when Claude does the work).
 
 ## 3. Let Claude drive Blender (Blender MCP)
 
@@ -77,5 +78,16 @@ Blender, so only connect it to Claude.
 ## 4. How Claude builds it in the cloud
 
 Cloud sessions use Blender as a Python module (`pip install bpy`) and run
-`python blender/build_tank.py`, which is the same script as `build.ps1` runs on your PC. Renders use
+`python blender/build_abrams.py`, which is the same script as `build.ps1` runs on your PC. Renders use
 Cycles on the CPU because there's no graphics card there.
+
+## Desert Sentinel (the 1.4.0 Battle Tank)
+
+The in-game Battle Tank is now made from the hand-refined Desert Sentinel scene (kept on the modding PC, not in this repo).
+`blender/sentinel/export_game.py` turns that scene into the game files:
+
+1. joins everything under the `Turret` empty into one turret mesh and everything else into one hull mesh, cutting the polygon count (tracks and running gear the most);
+2. unwraps the painted parts and bakes their colour (camo, decals, procedural paint) into `tank_hull.png` / `tank_turret.png`; plain-coloured parts keep their colour in the `.mtl`;
+3. exports `tank_hull.obj` (origin on the ground under the turret ring) and `tank_turret.obj` (origin at the ring, 1.86 m up).
+
+Run it inside Blender with `exec(open(r"F:\zed-zone-mods\tank-blender\export_game.py", encoding="utf-8").read())`, then copy the files from `F:\zed-zone-mods\tank-blender\game` into `src/model3d` (rotate to Blender axes and gzip the `.obj` files as the 1.4.0 commit did). `sentinel_helpers.py` holds the mesh-building helpers the scene's parts were made with.

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -14,10 +15,10 @@ namespace ZedTank;
 internal static class Model3D
 {
 	// model space (Unity axes, metres): +Z = front, +Y = up, +X = right. Origin = ground under the ring.
-	private const float HullLength = 7.9f;
-	private static readonly Vector3 TurretPivot = new Vector3(0f, 2.0f, 0f);
-	internal static readonly Vector3 BarrelTip = new Vector3(0f, 0.42f, 7.75f);   // turret space
-	internal static readonly Vector3 MgTip = new Vector3(-0.85f, 1.32f, 1.4f);     // turret space
+	private const float HullLength = 8.1f;
+	private static readonly Vector3 TurretPivot = new Vector3(0f, 1.86f, 0f);
+	internal static readonly Vector3 BarrelTip = new Vector3(0f, 0.25f, 5.75f);   // turret space
+	internal static readonly Vector3 MgTip = new Vector3(0.46f, 1.15f, 1.05f);    // turret space (commander's .50 cal)
 
 	private class Part
 	{
@@ -27,6 +28,8 @@ internal static class Model3D
 
 	private static Part _hull, _turret;
 	private static Dictionary<string, Color> _colors;
+	private static Dictionary<string, string> _texFile;
+	private static readonly Dictionary<string, Texture2D> _tex = new Dictionary<string, Texture2D>();
 	private static bool _loadTried;
 
 	private class State
@@ -52,10 +55,61 @@ internal static class Model3D
 
 	private static string Res(string name)
 	{
+		var asm = typeof(Model3D).Assembly;
+		using Stream s = asm.GetManifestResourceStream("model3d." + name);
+		if (s != null)
+		{
+			using var r = new StreamReader(s);
+			return r.ReadToEnd();
+		}
+		// big meshes ship gzipped (model3d/<name>.gz)
+		using Stream g = asm.GetManifestResourceStream("model3d." + name + ".gz");
+		if (g == null) return null;
+		using var z = new System.IO.Compression.GZipStream(g, System.IO.Compression.CompressionMode.Decompress);
+		using var rz = new StreamReader(z);
+		return rz.ReadToEnd();
+	}
+
+	private static byte[] ResBytes(string name)
+	{
 		using Stream s = typeof(Model3D).Assembly.GetManifestResourceStream("model3d." + name);
 		if (s == null) return null;
-		using var r = new StreamReader(s);
-		return r.ReadToEnd();
+		byte[] b = new byte[s.Length];
+		int r;
+		for (int i = 0; i < b.Length; i += r)
+		{
+			r = s.Read(b, i, b.Length - i);
+			if (r <= 0) break;
+		}
+		return b;
+	}
+
+	// the paint texture baked in Blender (map_Kd in the .mtl), embedded next to the .obj
+	private static Texture2D Tex(string file)
+	{
+		if (string.IsNullOrEmpty(file)) return null;
+		if (_tex.TryGetValue(file, out Texture2D t)) return t;
+		t = null;
+		try
+		{
+			byte[] b = ResBytes(file);
+			if (b == null) TLog.Warn("3D model: missing texture " + file);
+			else
+			{
+				t = new Texture2D(2, 2, TextureFormat.RGBA32, true);
+				t.hideFlags = HideFlags.HideAndDontSave;
+				ImageConversion.LoadImage(t, (Il2CppStructArray<byte>)b);
+				t.wrapMode = TextureWrapMode.Clamp;
+				t.filterMode = FilterMode.Trilinear;
+				t.anisoLevel = 4;
+				t.Apply(true, false);
+				Object.DontDestroyOnLoad(t);
+				TLog.Info($"3D model texture '{file}': {t.width}x{t.height}");
+			}
+		}
+		catch (Exception e) { TLog.Warn("3D model texture " + file + ": " + e.Message); t = null; }
+		_tex[file] = t;
+		return t;
 	}
 
 	private static float F(string s) => float.Parse(s, NumberStyles.Float, CultureInfo.InvariantCulture);
@@ -68,6 +122,12 @@ internal static class Model3D
 		{
 			string l = raw.Trim();
 			if (l.StartsWith("newmtl ")) cur = l.Substring(7).Trim();
+			else if (l.StartsWith("map_Kd ") && cur != null)
+			{
+				string f = l.Substring(7).Trim().Replace('\\', '/');
+				int k = f.LastIndexOf('/');
+				_texFile[cur] = k >= 0 ? f.Substring(k + 1) : f;
+			}
 			else if (l.StartsWith("Kd ") && cur != null)
 			{
 				string[] a = l.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -86,7 +146,9 @@ internal static class Model3D
 		LoadMtl(Res(name + ".mtl"));
 		var pos = new List<Vector3>();
 		var nrm = new List<Vector3>();
+		var tc = new List<Vector2>();
 		var norms = new List<Vector3>();
+		var uvs = new List<Vector2>();
 		var byMat = new Dictionary<string, List<int>>();
 		var order = new List<string>();
 		var verts = new List<Vector3>();
@@ -105,6 +167,11 @@ internal static class Model3D
 				string[] a = l.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 				nrm.Add(new Vector3(-F(a[2]), F(a[3]), F(a[1])));
 			}
+			else if (l.StartsWith("vt "))
+			{
+				string[] a = l.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+				tc.Add(new Vector2(F(a[1]), F(a[2])));
+			}
 			else if (l.StartsWith("usemtl ")) mat = l.Substring(7).Trim();
 			else if (l.StartsWith("f "))
 			{
@@ -112,6 +179,7 @@ internal static class Model3D
 				if (!byMat.TryGetValue(mat, out var tris)) { tris = new List<int>(); byMat[mat] = tris; order.Add(mat); }
 				var idx = new List<int>();
 				var nid = new List<int>();
+				var tid = new List<int>();
 				for (int i = 1; i < a.Length; i++)
 				{
 					string[] parts = a[i].Split('/');
@@ -119,6 +187,8 @@ internal static class Model3D
 					idx.Add(n > 0 ? n - 1 : pos.Count + n);
 					int nn = parts.Length >= 3 && parts[2].Length > 0 ? int.Parse(parts[2], CultureInfo.InvariantCulture) : 0;
 					nid.Add(nn > 0 ? nn - 1 : (nn < 0 ? nrm.Count + nn : -1));
+					int tt = parts.Length >= 2 && parts[1].Length > 0 ? int.Parse(parts[1], CultureInfo.InvariantCulture) : 0;
+					tid.Add(tt > 0 ? tt - 1 : (tt < 0 ? tc.Count + tt : -1));
 				}
 				for (int i = 1; i + 1 < idx.Count; i++)
 				{
@@ -129,6 +199,7 @@ internal static class Model3D
 						tris.Add(verts.Count);
 						verts.Add(pos[idx[c]]);
 						norms.Add(nid[c] >= 0 && nid[c] < nrm.Count ? nrm[nid[c]] : Vector3.zero);
+						uvs.Add(tid[c] >= 0 && tid[c] < tc.Count ? tc[tid[c]] : Vector2.zero);
 					}
 				}
 			}
@@ -141,6 +212,7 @@ internal static class Model3D
 		// Blender's smooth-by-angle normals when the file has them, flat otherwise
 		bool haveN = norms.Count == verts.Count && norms.TrueForAll(n => n.sqrMagnitude > 0.01f);
 		if (haveN) m.normals = norms.ToArray();
+		if (tc.Count > 0) m.uv = uvs.ToArray();
 		else m.RecalculateNormals();
 		m.RecalculateBounds();
 		var p = new Part { Mesh = m };
@@ -158,6 +230,7 @@ internal static class Model3D
 		try
 		{
 			_colors = new Dictionary<string, Color>();
+			_texFile = new Dictionary<string, string>();
 			_hull = LoadObj("tank_hull");
 			_turret = LoadObj("tank_turret");
 		}
@@ -196,11 +269,19 @@ internal static class Model3D
 		for (int i = 0; i < list.Length; i++)
 		{
 			Material m = b != null ? new Material(b) : new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
-			Color c = _colors.TryGetValue(p.Mats[i], out Color cc) ? cc : Color.gray;
+			Texture2D tex = _texFile.TryGetValue(p.Mats[i], out string tf) ? Tex(tf) : null;
+			Color c = tex != null ? Color.white : (_colors.TryGetValue(p.Mats[i], out Color cc) ? cc : Color.gray);
 			foreach (string prop in new[] { "_BaseColor", "_Color", "_MainColor", "_Tint" })
 				if (m.HasProperty(prop)) m.SetColor(prop, c);
-			foreach (string prop in new[] { "_BaseMap", "_MainTex", "_PaintTex", "_PaintLayerTex", "_DetailTex" })
+			foreach (string prop in new[] { "_PaintTex", "_PaintLayerTex", "_DetailTex" })
 				if (m.HasProperty(prop)) m.SetTexture(prop, Texture2D.whiteTexture);
+			foreach (string prop in new[] { "_BaseMap", "_MainTex" })
+				if (m.HasProperty(prop))
+				{
+					m.SetTexture(prop, tex != null ? tex : Texture2D.whiteTexture);
+					m.SetTextureScale(prop, Vector2.one);
+					m.SetTextureOffset(prop, Vector2.zero);
+				}
 			m.name = "zt_" + p.Mats[i];
 			list[i] = m;
 		}

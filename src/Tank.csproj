@@ -32,7 +32,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="art.*.png" LogicalName="%(Filename)%(Extension)" WithCulture="false" />
-    <EmbeddedResource Include="model3d\*.obj;model3d\*.mtl" LogicalName="model3d.%(Filename)%(Extension)" WithCulture="false" />
+    <EmbeddedResource Include="model3d\*.obj;model3d\*.mtl;model3d\*.png;model3d\*.gz" LogicalName="model3d.%(Filename)%(Extension)" WithCulture="false" />
   </ItemGroup>
 
   <Target Name="CopyToMods" AfterTargets="Build" Condition="'$(CopyToMods)' == 'true'">
