@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.2.2";
+	public const string Version = "1.2.3";
 
 	internal static ManualLogSource L;
 
@@ -31,6 +31,7 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<bool> RocketsIfNoShells;
 	internal static ConfigEntry<bool> RequireKit;
 	internal static ConfigEntry<bool> CrewSafe;
+	internal static ConfigEntry<string> MgSoundWeapon;
 	internal static ConfigEntry<float> CrewSafeRadius;
 	internal static ConfigEntry<float> RocketDamage;
 	internal static ConfigEntry<float> RocketSpeed;
@@ -72,6 +73,7 @@ public class TankPlugin : BasePlugin
 		MgRange = Config.Bind("MachineGun", "Range", 22f, "Machine gun range (tiles).");
 		NoiseRadius = Config.Bind("Effects", "NoiseRadius", 30f, "Zombies within this range hear the guns.");
 		FxScale = Config.Bind("Effects", "EffectScale", 2f, "Size of tracers, muzzle flashes and smoke.");
+		MgSoundWeapon = Config.Bind("Effects", "MachineGunSoundFrom", "", "Part of a gun's name (or fire sound name) to borrow the machine gun sound from, e.g. M249. Empty = pick a machine gun automatically. The choices are listed in BepInEx\\Tank.log.");
 		Volume = Config.Bind("Effects", "Volume", 0.8f, new ConfigDescription("Gun volume.", new AcceptableValueRange<float>(0f, 1f)));
 		try
 		{
