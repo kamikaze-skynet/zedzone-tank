@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.3
+
+- Battle Tank: the car shader's spray-paint layer now gets a fully transparent texture. Left empty, it read as solid white and washed the whole tank out.
+
 ## 1.4.2
 
 - Battle Tank: parts no longer look pale or see-through. The camo was also going into the car shader's spray-paint layer, which is drawn on top of the paint; that layer is now left empty, and Unity's lightmap slots are left alone.

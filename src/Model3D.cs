@@ -265,6 +265,20 @@ internal static class Model3D
 	private static readonly Dictionary<int, Texture2D> _solid = new Dictionary<int, Texture2D>();
 	private static bool _propsLogged;
 
+	// fully transparent texture: an empty slot reads as white in a shader graph,
+	// which painted a white spray layer over the whole tank
+	private static Texture2D _clear;
+	private static Texture2D Clear()
+	{
+		if (_clear != null) return _clear;
+		_clear = new Texture2D(4, 4, TextureFormat.RGBA32, false);
+		_clear.hideFlags = HideFlags.HideAndDontSave;
+		for (int y = 0; y < 4; y++) for (int x = 0; x < 4; x++) _clear.SetPixel(x, y, new Color(0f, 0f, 0f, 0f));
+		_clear.Apply(false, false);
+		Object.DontDestroyOnLoad(_clear);
+		return _clear;
+	}
+
 	// one-pixel-colour texture for parts that have no baked paint
 	private static Texture2D Solid(Color c)
 	{
@@ -308,7 +322,7 @@ internal static class Model3D
 					{
 						// lightmaps belong to Unity, and the spray-paint layer is drawn on
 						// top of the paint (our camo there made parts pale and see-through)
-						if (prop.IndexOf("Spray", StringComparison.OrdinalIgnoreCase) >= 0) m.SetTexture(prop, null);
+						if (prop.IndexOf("Spray", StringComparison.OrdinalIgnoreCase) >= 0) m.SetTexture(prop, Clear());
 					}
 					else if (ty == ShaderPropertyType.Texture)
 					{
