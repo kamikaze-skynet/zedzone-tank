@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.3
+
+- New moving sound: a Leopard 2A4 driving loop.
+
 ## 1.6.2
 
 - Real tank recordings replace the made-up sounds: a Leopard 2A7 engine start-up when the engine is turned on, its idle, and a tank moving loop (engine and tracks) while driving. The game fades and pitches them like any car engine. The made-up sound styles and the separate track loop are gone (Effects.TankSoundStyle, Effects.TrackVolume removed).
