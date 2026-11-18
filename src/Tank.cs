@@ -859,6 +859,7 @@ internal static partial class Tank
 				seen.Add(v.Pointer);
 				Vis x = EnsureVis(v);
 				bool d3 = Is3D(v) && Model3D.Tick(v, x.TurretRel, now);
+				if (Is3D(v)) TankBase.Apply(v);
 				if (x.Hull.enabled == d3) { x.Hull.enabled = !d3; x.HullShadow.enabled = !d3; x.Turret.enabled = !d3; }
 				if (!d3)
 				{

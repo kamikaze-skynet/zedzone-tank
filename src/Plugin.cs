@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.4.9";
+	public const string Version = "1.5.0";
 
 	internal static ManualLogSource L;
 
@@ -34,6 +34,8 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<float> Model3DSize;
 	internal static ConfigEntry<float> Model3DZoom;
 	internal static ConfigEntry<bool> DrawDiagnostics;
+	internal static ConfigEntry<bool> BaseEnabled;
+	internal static ConfigEntry<float> BaseMass, BaseArmour, BaseTopSpeed, BaseTurn;
 	internal static ConfigEntry<int> Model3DPictureSize;
 	internal static ConfigEntry<float> Model3DNearClip;
 	internal static ConfigEntry<bool> Model3DFlip;
@@ -65,6 +67,11 @@ public class TankPlugin : BasePlugin
 		Model3DPictureSize = Config.Bind("BattleTank", "PictureSize", 768, "Pixel size of the picture the car camera films the Battle Tank into (the game uses 256 for cars; the tank is zoomed out, so it needs more to stay sharp). 0 keeps the game's picture.");
 		Model3DNearClip = Config.Bind("BattleTank", "CameraNearClip", 12f, "How far in front of the car camera the Battle Tank may reach before it is cut off (the camera is orthographic, so this can reach behind it).");
 		DrawDiagnostics = Config.Bind("Debug", "DrawDiagnostics", true, "Write how the Battle Tank is drawn (car camera, its picture, the quad on the map, every renderer) to Tank.log a few times after it appears.");
+		BaseEnabled = Config.Bind("BattleTankBase", "Enabled", true, "Make the pickup under a Battle Tank into a tank of its own: hit box the size of the tank, heavier, more armour, tank handling.");
+		BaseMass = Config.Bind("BattleTankBase", "Weight", 4f, "Battle Tank weight compared with the pickup it is built on (heavier pushes cars aside and isn't shoved by them).");
+		BaseArmour = Config.Bind("BattleTankBase", "Armour", 5f, "Battle Tank bodywork health compared with the pickup.");
+		BaseTopSpeed = Config.Bind("BattleTankBase", "TopSpeed", 0.8f, "Battle Tank top speed compared with the pickup.");
+		BaseTurn = Config.Bind("BattleTankBase", "TurnRate", 1f, "Battle Tank turning speed compared with the pickup.");
 		Model3DFlip = Config.Bind("BattleTank", "FlipModel", false, "Turn the 3D model around if it drives backwards.");
 		SortingOrder = Config.Bind("Look", "SortingOrder", 32000, "Draw order of the tank's art (higher draws on top of more things).");
 		CrewDamage = Config.Bind("Armor", "CrewDamageTaken", 0.1f, new ConfigDescription("Share of damage that reaches the crew inside (a car is much higher).", new AcceptableValueRange<float>(0f, 1f)));

@@ -686,6 +686,7 @@ internal static class Model3D
 				TLog.Info($"3D tank picture: {cur.width}x{cur.height} {cur.format} -> {want}x{want} (camera zoom x{k:0.##})");
 			}
 			c.targetTexture = s.Pic;
+			try { v.vehicleRenderTexture = s.Pic; } catch { }
 			Renderer q = v.vehicleQuadRenderer;
 			if (q != null)
 				foreach (Material m in q.sharedMaterials)
