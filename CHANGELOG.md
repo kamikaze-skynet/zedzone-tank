@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.1
+- Battle Tank model rebuilt with far more detail (about 48,000 triangles, was 6,500): individual track links with guide horns, paired road wheels with hub bolts, toothed sprockets, spoked idlers, bolted skirts, louvred engine deck, tow cables, periscopes, commander's cupola with vision blocks, gun bellows and sleeve bands, smoke launchers, loaded stowage basket. Smooth shading now carries into the game.
+
 ## 1.3.0
 - New **Battle Tank**: a real 3D model (built in Blender, `blender/build_tank.py`) drawn by the game's own car camera, with a turret that turns in 3D. Build a **Battle Tank Kit** at a workbench (80 Iron Plate, 30 Metal Component, 15 Copper Tube, 25 Iron Wire, 15 Copper Wire), carry it and press Page Up. Settings under `[BattleTank]`. See BLENDER.md for editing the model and connecting Claude to Blender.
 

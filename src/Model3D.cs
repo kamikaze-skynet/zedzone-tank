@@ -85,6 +85,8 @@ internal static class Model3D
 		if (text == null) { TLog.Warn("3D model: missing resource " + name); return null; }
 		LoadMtl(Res(name + ".mtl"));
 		var pos = new List<Vector3>();
+		var nrm = new List<Vector3>();
+		var norms = new List<Vector3>();
 		var byMat = new Dictionary<string, List<int>>();
 		var order = new List<string>();
 		var verts = new List<Vector3>();
@@ -98,26 +100,36 @@ internal static class Model3D
 				float x = F(a[1]), y = F(a[2]), z = F(a[3]);
 				pos.Add(new Vector3(-y, z, x));
 			}
+			else if (l.StartsWith("vn "))
+			{
+				string[] a = l.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+				nrm.Add(new Vector3(-F(a[2]), F(a[3]), F(a[1])));
+			}
 			else if (l.StartsWith("usemtl ")) mat = l.Substring(7).Trim();
 			else if (l.StartsWith("f "))
 			{
 				string[] a = l.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 				if (!byMat.TryGetValue(mat, out var tris)) { tris = new List<int>(); byMat[mat] = tris; order.Add(mat); }
 				var idx = new List<int>();
+				var nid = new List<int>();
 				for (int i = 1; i < a.Length; i++)
 				{
-					string v = a[i];
-					int slash = v.IndexOf('/');
-					int n = int.Parse(slash >= 0 ? v.Substring(0, slash) : v, CultureInfo.InvariantCulture);
+					string[] parts = a[i].Split('/');
+					int n = int.Parse(parts[0], CultureInfo.InvariantCulture);
 					idx.Add(n > 0 ? n - 1 : pos.Count + n);
+					int nn = parts.Length >= 3 && parts[2].Length > 0 ? int.Parse(parts[2], CultureInfo.InvariantCulture) : 0;
+					nid.Add(nn > 0 ? nn - 1 : (nn < 0 ? nrm.Count + nn : -1));
 				}
 				for (int i = 1; i + 1 < idx.Count; i++)
 				{
 					// the axis swap mirrors the model, which also turns Blender's
 					// counter-clockwise faces into Unity's clockwise front faces
-					tris.Add(verts.Count); verts.Add(pos[idx[0]]);
-					tris.Add(verts.Count); verts.Add(pos[idx[i]]);
-					tris.Add(verts.Count); verts.Add(pos[idx[i + 1]]);
+					foreach (int c in new[] { 0, i, i + 1 })
+					{
+						tris.Add(verts.Count);
+						verts.Add(pos[idx[c]]);
+						norms.Add(nid[c] >= 0 && nid[c] < nrm.Count ? nrm[nid[c]] : Vector3.zero);
+					}
 				}
 			}
 		}
@@ -126,7 +138,10 @@ internal static class Model3D
 		m.vertices = verts.ToArray();
 		m.subMeshCount = order.Count;
 		for (int i = 0; i < order.Count; i++) m.SetTriangles(byMat[order[i]].ToArray(), i);
-		m.RecalculateNormals();
+		// Blender's smooth-by-angle normals when the file has them, flat otherwise
+		bool haveN = norms.Count == verts.Count && norms.TrueForAll(n => n.sqrMagnitude > 0.01f);
+		if (haveN) m.normals = norms.ToArray();
+		else m.RecalculateNormals();
 		m.RecalculateBounds();
 		var p = new Part { Mesh = m };
 		p.Mats.AddRange(order);
