@@ -29,6 +29,7 @@ internal static class P_Name1
 	private static void Postfix(int textid, ref string __result)
 	{
 		if (textid == Tank.NameId) __result = "Tank";
+		else if (textid == Tank.NameId3D) __result = "Battle Tank";
 	}
 }
 
@@ -38,6 +39,7 @@ internal static class P_Name2
 	private static void Postfix(int textid, ref string __result)
 	{
 		if (textid == Tank.NameId) __result = "Tank";
+		else if (textid == Tank.NameId3D) __result = "Battle Tank";
 	}
 }
 
@@ -47,5 +49,6 @@ internal static class P_Name3
 	private static void Postfix(int textid, ref string __result)
 	{
 		if (textid == Tank.NameId) __result = "Tank";
+		else if (textid == Tank.NameId3D) __result = "Battle Tank";
 	}
 }

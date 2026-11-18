@@ -12,6 +12,15 @@ public static class TankApi
 		return Tank.CallIn(gc.playerCharacter, ignoreLimit);
 	}
 
+	/// <summary>Puts a Battle Tank (the real 3D model) in front of the local player. '!' = failed.</summary>
+	public static string CallInBattleTank(bool ignoreLimit)
+	{
+		if (!TankRunner.Active) return "!Tank mod is off (disabled in its config)";
+		GameController gc = GameController.instance;
+		if (gc == null || gc.playerCharacter == null) return "!Load into a world first";
+		return Tank.CallIn(gc.playerCharacter, ignoreLimit, false, true);
+	}
+
 	/// <summary>The item id of the main gun's ammo (the 105 mm Tank Shell), or -1.</summary>
 	public static int RocketItemId()
 	{

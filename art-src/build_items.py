@@ -17,6 +17,14 @@ KIT_NAME = "Tank Kit"
 KIT_DESC = ("Everything needed to put a main battle tank together: armour plate, a diesel power pack, tracks and a turret, "
             "packed in one heavy crate. Built at a workbench. Carry it and press Page Up to have the tank assembled "
             "in front of you; the kit is used up.")
+KIT3_GUID = "c3d0b7e1-5a4e-4f6b-9d2a-3d7a4c0e7a4c"
+KIT3_RID = 881107
+KIT3_NAME = "Battle Tank Kit"
+KIT3_DESC = ("A heavier crate for the Battle Tank: a fully modelled main battle tank with a turret that turns in 3D, "
+             "a 105 mm gun and a roof machine gun. Built at a workbench. Carry it and press Page Up to have it assembled "
+             "in front of you; the kit is used up (a Battle Tank Kit is used before a Tank Kit).")
+# Iron Plate, Metal Component, Copper Tube, Iron Wire, Copper Wire
+KIT3_RECIPE = [(8, 80), (62, 30), (11, 15), (12, 25), (13, 15)]
 NAME = "105 mm Tank Shell"
 DESC = ("A 105 mm high-explosive anti-tank round for the tank's main gun. A brass case full of propellant "
         "and a shaped-charge warhead with a long stand-off probe on the nose. Load it into the tank's cargo or "
@@ -57,11 +65,11 @@ def draw_shell(scale=1):
     d.polygon([(488 * s, cy - 8 * s), (504 * s, cy), (488 * s, cy + 8 * s)], fill=(60, 62, 58, 255), outline=(20, 20, 20, 255))
     return im
 
-def draw_kit():
+def draw_kit(body=(92, 100, 56, 255), title="TANK KIT"):
     im = Image.new("RGBA", (256, 192), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     ol = (24, 26, 16, 255)
-    d.rectangle([8, 24, 248, 184], fill=(92, 100, 56, 255), outline=ol, width=4)      # crate
+    d.rectangle([8, 24, 248, 184], fill=body, outline=ol, width=4)      # crate
     for x in (8, 244):
         d.rectangle([x, 24, x + 4, 184], fill=(70, 76, 42, 255))
     for y in (60, 148):
@@ -77,7 +85,7 @@ def draw_kit():
     d.rectangle([154, 93, 214, 98], fill=st)           # barrel
     for cx in range(74, 190, 20):
         d.ellipse([cx - 8, 124, cx + 8, 140], fill=st)  # road wheels
-    d.text((96, 40), "TANK KIT", fill=st)
+    d.text((128 - len(title) * 3, 40), title, fill=st)
     d.text((100, 156), "105 MM", fill=st)
     return im
 
@@ -145,6 +153,21 @@ def main():
         "ammoNumber": 1, "ammoBaseDamage": 0.0,
     }
     pack("tankkit", "Ammo", k, kit, preview_of(kit, (384, 288), "Tank Kit"))
+
+    # Battle Tank Kit: same kind of item, darker crate; its preview is a render of the 3D model
+    kit3 = draw_kit((70, 74, 46, 255), "BATTLE TANK")
+    k3 = dict(k)
+    k3.update({"modGuid": KIT3_GUID, "runtimeId": KIT3_RID, "itemName": KIT3_NAME, "itemName_EN": KIT3_NAME,
+               "itemDescription": KIT3_DESC, "itemDescription_EN": KIT3_DESC, "weight": 50.0, "itemPrice": 30000.0,
+               "craftRecipeItems": [{"itemId": i, "itemNumber": float(n)} for i, n in KIT3_RECIPE]})
+    render = os.path.join(REPO, "blender", "out", "preview_iso.png")
+    if os.path.exists(render):
+        r = Image.open(render).convert("RGB")
+        w, h = r.size
+        prev3 = r.crop(((w - h) // 2, 0, (w - h) // 2 + h, h)).resize((512, 512), Image.LANCZOS)
+    else:
+        prev3 = preview_of(kit3, (384, 288), "Battle Tank Kit")
+    pack("battletankkit", "Ammo", k3, kit3, prev3)
 
 if __name__ == "__main__":
     main()

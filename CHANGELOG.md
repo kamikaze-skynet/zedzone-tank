@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.0
+- New **Battle Tank**: a real 3D model (built in Blender, `blender/build_tank.py`) drawn by the game's own car camera, with a turret that turns in 3D. Build a **Battle Tank Kit** at a workbench (80 Iron Plate, 30 Metal Component, 15 Copper Tube, 25 Iron Wire, 15 Copper Wire), carry it and press Page Up. Settings under `[BattleTank]`. See BLENDER.md for editing the model and connecting Claude to Blender.
+
 ## 1.2.3
 - The roof machine gun had no sound: it picked the flamethrower's looping sound. It now picks a real machine gun's fire sound (setting `Effects.MachineGunSoundFrom` picks a specific gun).
 

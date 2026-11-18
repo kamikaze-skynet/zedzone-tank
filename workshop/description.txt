@@ -3,6 +3,7 @@ A drivable main battle tank for ZED ZONE.
 
 [list]
 [*]Build a [b]Tank Kit[/b] at a workbench (60 Iron Plate, 20 Metal Component, 10 Copper Tube, 20 Iron Wire, 10 Copper Wire), carry it and press [b]Page Up[/b]: the tank is assembled in front of you and the kit is used up.
+[*][b]Battle Tank[/b]: a real 3D model with a turret that turns in 3D. Build a [b]Battle Tank Kit[/b] (80 Iron Plate, 30 Metal Component, 15 Copper Tube, 25 Iron Wire, 15 Copper Wire) and press Page Up while carrying it.
 [*]Drives like the game's cars and [b]burns gasoline the same way[/b]. [b]Shift + Page Up[/b] next to it pours your gas cans in.
 [*]The [b]turret follows your mouse[/b].
 [*][b]Left click[/b]: main gun, fires 105 mm Tank Shells, a new ammo item (one per shot from the cargo or your backpack).

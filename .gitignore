@@ -7,3 +7,4 @@ tools/
 .idea/
 # the built DLL is copied in at publish time
 workshop/content/Tank/*.dll
+*.blend1
