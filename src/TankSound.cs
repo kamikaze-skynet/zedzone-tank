@@ -16,110 +16,58 @@ internal static class TankSound
 	private class St { public AudioSource Tracks; public float Vol; }
 	private static readonly Dictionary<IntPtr, St> _st = new Dictionary<IntPtr, St>();
 
+	private static string _style, _raw;
+
+	// Loops made offline by art-src/tank_sounds.py and embedded as sounds.<style>_<part>.wav.
 	private static void Make()
 	{
-		if (_made) return;
+		string raw = TankPlugin.SoundStyle.Value ?? "diesel";
+		if (_made && ReferenceEquals(raw, _raw)) return;
+		_raw = raw;
+		string style = raw.Trim().ToLowerInvariant().Replace(' ', '_');
+		if (_made && style == _style) return;
 		_made = true;
+		_style = style;
 		try
 		{
-			_idle = Clip("zt_tank_idle", Engine(2f, 26f, 0.25f, 0.05f, 1));
-			_run = Clip("zt_tank_engine", Engine(2f, 44f, 0.45f, 0.12f, 2));
-			_tracks = Clip("zt_tank_tracks", Tracks(1f, 3));
-			TLog.Info("Tank sounds made: engine idle, engine, tracks");
+			_idle = Load(style, "idle");
+			_run = Load(style, "drive");
+			_tracks = Load(style, "tracks");
+			if (_idle == null || _run == null || _tracks == null)
+			{
+				TLog.Warn($"Tank sounds: style '{style}' not found (diesel, heavy_diesel, turbine); using diesel");
+				_idle = Load("diesel", "idle"); _run = Load("diesel", "drive"); _tracks = Load("diesel", "tracks");
+			}
+			foreach (St st in _st.Values) if (st.Tracks != null) { st.Tracks.clip = _tracks; }
+			TLog.Info($"Tank sounds: style '{style}'");
 		}
 		catch (Exception e) { TLog.Warn("tank sounds: " + e.Message); }
 	}
 
-	private static AudioClip Clip(string name, float[] data)
+	private static AudioClip Load(string style, string part)
 	{
-		AudioClip c = AudioClip.Create(name, data.Length, 1, Rate, false);
-		c.SetData(data, 0);
+		using var st = typeof(TankSound).Assembly.GetManifestResourceStream($"sounds.{style}_{part}.wav");
+		if (st == null) return null;
+		using var br = new System.IO.BinaryReader(st);
+		byte[] all = br.ReadBytes((int)st.Length);
+		// 16-bit PCM WAV: find the "fmt " and "data" chunks
+		int ch = 1, rate = Rate, pos = 12, dataAt = -1, dataLen = 0;
+		while (pos + 8 <= all.Length)
+		{
+			string id = System.Text.Encoding.ASCII.GetString(all, pos, 4);
+			int len = BitConverter.ToInt32(all, pos + 4);
+			if (id == "fmt ") { ch = BitConverter.ToInt16(all, pos + 10); rate = BitConverter.ToInt32(all, pos + 12); }
+			else if (id == "data") { dataAt = pos + 8; dataLen = Math.Min(len, all.Length - dataAt); break; }
+			pos += 8 + len + (len & 1);
+		}
+		if (dataAt < 0) return null;
+		int n = dataLen / 2;
+		var d = new float[n];
+		for (int i = 0; i < n; i++) d[i] = BitConverter.ToInt16(all, dataAt + i * 2) / 32768f;
+		AudioClip c = AudioClip.Create($"zt_tank_{style}_{part}", n / ch, ch, rate, false);
+		c.SetData(d, 0);
 		c.hideFlags = HideFlags.DontUnloadUnusedAsset;
 		return c;
-	}
-
-	// Diesel/turbine rumble: firing pulses at f Hz (whole cycles per loop so it loops cleanly),
-	// low harmonics, rough low-passed noise and a faint turbine whine.
-	private static float[] Engine(float secs, float f, float noise, float whine, int seed)
-	{
-		int n = (int)(secs * Rate);
-		var rnd = new System.Random(seed);
-		var d = new float[n];
-		// low-passed noise, run twice around the loop so its ends join up
-		var nz = new float[n];
-		float lp = 0f;
-		for (int pass = 0; pass < 2; pass++)
-			for (int i = 0; i < n; i++)
-			{
-				lp += (float)(rnd.NextDouble() * 2 - 1 - lp) * 0.06f;
-				nz[i] = lp;
-			}
-		float period = Rate / f;
-		for (int i = 0; i < n; i++)
-		{
-			float t = i / (float)Rate;
-			float ph = (i % period) / period;              // 0..1 inside one firing cycle
-			float pulse = Mathf.Exp(-ph * 7f);             // a thump each cycle
-			float body = 0.55f * Mathf.Sin(2 * Mathf.PI * f * t)
-				+ 0.3f * Mathf.Sin(2 * Mathf.PI * f * 2 * t + 0.6f)
-				+ 0.15f * Mathf.Sin(2 * Mathf.PI * f * 3 * t + 1.3f);
-			float wh = whine * Mathf.Sin(2 * Mathf.PI * f * 28 * t) * (0.8f + 0.2f * Mathf.Sin(2 * Mathf.PI * 0.5f * t));
-			d[i] = (0.5f * body + 0.5f * pulse * body + noise * nz[i] * 4f * (0.6f + 0.4f * pulse) + wh);
-		}
-		Normalize(d, 0.8f);
-		return d;
-	}
-
-	// Track clatter: 14 link clanks a second (whole number per loop), each a short metallic ring
-	// with a click, over a low grinding rumble.
-	private static float[] Tracks(float secs, int seed)
-	{
-		int n = (int)(secs * Rate);
-		var rnd = new System.Random(seed);
-		var d = new float[n];
-		float lp = 0f;
-		var grind = new float[n];
-		for (int pass = 0; pass < 2; pass++)
-			for (int i = 0; i < n; i++)
-			{
-				lp += (float)(rnd.NextDouble() * 2 - 1 - lp) * 0.03f;
-				grind[i] = lp;
-			}
-		int clanks = 14;
-		float[] freqs = { 1150f, 1730f, 2610f, 3900f };
-		for (int k = 0; k < clanks; k++)
-		{
-			int start = (int)(k * n / (float)clanks + (rnd.NextDouble() - 0.5) * 0.012 * Rate);
-			float amp = 0.6f + (float)rnd.NextDouble() * 0.4f;
-			float tune = 0.92f + (float)rnd.NextDouble() * 0.16f;
-			int len = (int)(0.07f * Rate);
-			for (int j = 0; j < len; j++)
-			{
-				int i = ((start + j) % n + n) % n;
-				float t = j / (float)Rate;
-				float env = Mathf.Exp(-t * 60f);
-				float ring = 0f;
-				for (int q = 0; q < freqs.Length; q++) ring += Mathf.Sin(2 * Mathf.PI * freqs[q] * tune * t) / (q + 1);
-				float click = j < 90 ? (float)(rnd.NextDouble() * 2 - 1) * (1f - j / 90f) : 0f;
-				d[i] += amp * (0.45f * ring * env + 0.6f * click);
-			}
-		}
-		for (int i = 0; i < n; i++)
-		{
-			float t = i / (float)Rate;
-			d[i] += grind[i] * 5f + 0.15f * Mathf.Sin(2 * Mathf.PI * 14f * 3 * t);
-		}
-		Normalize(d, 0.75f);
-		return d;
-	}
-
-	private static void Normalize(float[] d, float peak)
-	{
-		float m = 0f;
-		foreach (float x in d) m = Mathf.Max(m, Mathf.Abs(x));
-		if (m <= 0f) return;
-		float k = peak / m;
-		for (int i = 0; i < d.Length; i++) d[i] *= k;
 	}
 
 	internal static void Tick(BasicVehicle v)

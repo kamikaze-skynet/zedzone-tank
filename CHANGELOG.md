@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.1
+
+- New tank sounds: engine idle, engine and track loops are made offline by art-src/tank_sounds.py (V12 diesel firing pulses through exhaust resonances, link clanks, road-wheel rumble and track squeal) and embedded in the DLL. Three styles: diesel, heavy_diesel, turbine (Effects.TankSoundStyle).
+
 ## 1.6.0
 
 - Battle Tank only (General.BattleTankOnly, on): the old Tank Kit is no longer craftable, and every call-in brings a Battle Tank (an old Tank Kit you still carry works too). Tanks already in a save stay as they are.
