@@ -450,6 +450,19 @@ internal static class Model3D
 				}
 				catch { wheelbase = 3f; }
 			}
+			// Tyres read while the car is still settling (just spawned, on a slope, mid-bump) give a
+			// tilted frame, which leaves the tank leaning in the car picture for good. The car model
+			// is upright in its own space, so snap up to the model's up and forward to the nearest
+			// flat axis.
+			{
+				Vector3 rawUp = up, rawFwd = fwd;
+				up = Vector3.up;
+				Vector3 flat = new Vector3(fwd.x, 0f, fwd.z);
+				if (flat.sqrMagnitude < 1e-6f) flat = Vector3.forward;
+				fwd = Mathf.Abs(flat.x) > Mathf.Abs(flat.z) ? new Vector3(Mathf.Sign(flat.x), 0f, 0f) : new Vector3(0f, 0f, Mathf.Sign(flat.z));
+				if (Vector3.Angle(rawUp, up) > 3f || Vector3.Angle(rawFwd, fwd) > 3f)
+					TLog.Info($"3D tank: tyre frame up {rawUp} fwd {rawFwd} was tilted, using up {up} fwd {fwd}");
+			}
 			if (TankPlugin.Model3DFlip.Value) fwd = -fwd;
 			if (wheelbase < 0.1f) wheelbase = 3f;
 			float carLen = wheelbase * 1.55f;

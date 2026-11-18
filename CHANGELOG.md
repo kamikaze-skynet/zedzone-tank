@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.8
+
+- Battle Tank no longer leans: when the tank was called in while its base car was still settling, the tyres gave a tilted frame and the 3D model stayed tilted about 35 degrees inside the car picture. The model now always sits upright and faces straight along the car.
+
 ## 1.4.7
 
 - Battle Tank paint is bolder: more contrast and colour in the baked camo and the plain parts, and slightly darker, so the tank no longer looks faint on the map.
