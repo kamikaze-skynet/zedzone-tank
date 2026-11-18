@@ -634,6 +634,56 @@ internal static class Model3D
 	}
 
 
+	private static float _grassSortAt = -1f;
+	private static int _grassLayer, _grassOrder;
+	private static bool _grassFound, _grassLogged;
+	private static int _grassQueue = -1;
+
+	// Tall grass in front of the player is a separate "front" grass mesh drawn above people.
+	// Put the tank above that mesh too (layer and order), checked every few seconds.
+	private static void GrassSort(ref int layer, ref int ord)
+	{
+		float now = Time.realtimeSinceStartup;
+		if (now >= _grassSortAt)
+		{
+			_grassSortAt = now + 3f;
+			_grassFound = false;
+			try
+			{
+				TerrainGrassController g = TerrainGrassController.instance;
+				var sb = _grassLogged ? null : new System.Text.StringBuilder("Grass draw order:");
+				var rs = new System.Collections.Generic.List<Renderer>();
+				var cells = g?.frontActiveCells;
+				if (cells != null)
+					for (int i = 0; i < cells.Count && i < 4; i++)
+					{ var cell = cells[i]; if (cell == null) continue; rs.Add(cell.frontRenderer); rs.Add(cell.backRenderer); }
+				_grassQueue = -1;
+				foreach (Renderer r in rs)
+				{
+					if (r == null) continue;
+					int q = r.sharedMaterial != null ? r.sharedMaterial.renderQueue : -1;
+					if (q > _grassQueue) _grassQueue = q;
+					sb?.Append($" {r.name} layer '{r.sortingLayerName}' ({SortingLayer.GetLayerValueFromID(r.sortingLayerID)}) order {r.sortingOrder} queue {q} unityLayer {r.gameObject.layer};");
+					int lv = SortingLayer.GetLayerValueFromID(r.sortingLayerID);
+					if (!_grassFound || lv > SortingLayer.GetLayerValueFromID(_grassLayer) || (r.sortingLayerID == _grassLayer && r.sortingOrder > _grassOrder))
+					{ _grassLayer = r.sortingLayerID; _grassOrder = r.sortingOrder; _grassFound = true; }
+				}
+				if (sb != null && rs.Count == 0) sb.Append(" no grass cells yet;");
+				if (sb != null && (rs.Count > 0 || now > 120f))
+				{
+					sb.Append($" player layer '{SortingLayer.IDToName(Tank.SortLayer)}' ({SortingLayer.GetLayerValueFromID(Tank.SortLayer)})");
+					TLog.Info(sb.ToString());
+					_grassLogged = true;
+				}
+			}
+			catch (Exception e) { if (!_grassLogged) { _grassLogged = true; TLog.Warn("grass draw order: " + e.Message); } }
+		}
+		if (!_grassFound) return;
+		int gl = SortingLayer.GetLayerValueFromID(_grassLayer), pl = SortingLayer.GetLayerValueFromID(layer);
+		if (gl > pl) { layer = _grassLayer; ord = Mathf.Max(_grassOrder + 1, ord); }
+		else if (gl == pl) ord = Mathf.Max(ord, _grassOrder + 1);
+	}
+
 	// lowest layer the car camera films
 	private static int CamLayer(Camera c)
 	{
@@ -678,9 +728,22 @@ internal static class Model3D
 				Renderer qr = v.vehicleQuadRenderer;
 				if (qr != null)
 				{
-					int ord = TankPlugin.SortingOrder.Value;
-					if (qr.sortingLayerID != Tank.SortLayer) qr.sortingLayerID = Tank.SortLayer;
+					int sl = Tank.SortLayer, ord = TankPlugin.SortingOrder.Value;
+					GrassSort(ref sl, ref ord);
+					if (qr.sortingLayerID != sl) qr.sortingLayerID = sl;
 					if (qr.sortingOrder != ord) qr.sortingOrder = ord;
+					// The render queue wins over sorting layers: if grass draws in a later queue,
+					// draw the tank picture in a queue after it.
+					Material qm = qr.sharedMaterial;
+					if (qm != null && _grassQueue >= 0)
+					{
+						int wq = Mathf.Max(_grassQueue + 1, 3000);
+						if (qm.renderQueue < wq)
+						{
+							TLog.Info($"Tank picture queue {qm.renderQueue} -> {wq} (grass queue {_grassQueue})");
+							qm.renderQueue = wq;
+						}
+					}
 				}
 			}
 			int want = TankPlugin.Model3DPictureSize.Value;

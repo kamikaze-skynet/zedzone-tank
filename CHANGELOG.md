@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.10
+
+- Battle Tank picture is placed above the tall grass meshes themselves: it reads the grass cells' sorting layer, order and render queue and draws after them (the render queue wins over sorting layers, which is why 1.5.9 didn't help). Logs "Grass draw order:" once.
+
 ## 1.5.9
 
 - Battle Tank draws on top of tall grass and bushes like the classic tank: its car picture goes on the player's sprite layer at Look.SortingOrder (BattleTank.DrawOnTop). The game sorts car pictures in with the grass, which buried this big tank.
