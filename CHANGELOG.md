@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0
+
+- Battle Tank only (General.BattleTankOnly, on): the old Tank Kit is no longer craftable, and every call-in brings a Battle Tank (an old Tank Kit you still carry works too). Tanks already in a save stay as they are.
+- Battle Tank Kit costs the same as the old Tank Kit: 60 Iron Plate, 20 Metal Component, 10 Copper Tube, 20 Iron Wire, 10 Copper Wire, at a workbench.
+- Tank sounds made in code: a deep diesel/turbine engine replaces the base car's idle and driving loops (the game still pitches them with rpm), and track clatter follows the tank's speed (Effects.TankSounds, Effects.TrackVolume).
+
 ## 1.5.14
 
 - The tank's storage window is titled "Battle Tank" (or "Tank") instead of the base car's name "Pickup".

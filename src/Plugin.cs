@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.5.14";
+	public const string Version = "1.6.0";
 
 	internal static ManualLogSource L;
 
@@ -30,6 +30,9 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<bool> RocketsNeedAmmo;
 	internal static ConfigEntry<bool> RocketsIfNoShells;
 	internal static ConfigEntry<bool> RequireKit;
+	internal static ConfigEntry<bool> HideClassic;
+	internal static ConfigEntry<bool> TankSounds;
+	internal static ConfigEntry<float> TrackVolume;
 	internal static ConfigEntry<bool> CrewSafe;
 	internal static ConfigEntry<float> Model3DSize;
 	internal static ConfigEntry<float> Model3DZoom;
@@ -89,6 +92,9 @@ public class TankPlugin : BasePlugin
 		TurretSpeed = Config.Bind("MainGun", "TurretTurnSpeed", 120f, "How fast the turret turns toward the mouse (degrees per second).");
 		ReloadSeconds = Config.Bind("MainGun", "ReloadSeconds", 2.5f, "Seconds between main gun shots.");
 		RocketsNeedAmmo = Config.Bind("MainGun", "UseAmmo", true, "Each shot uses one 105 mm Tank Shell from the tank's cargo or your backpack.");
+		HideClassic = Config.Bind("General", "BattleTankOnly", true, "Only the Battle Tank: the old Tank Kit can't be crafted any more, and every call-in (also with an old Tank Kit) brings a Battle Tank. Tanks already in a save stay as they are.");
+		TankSounds = Config.Bind("Effects", "TankSounds", true, "Tank engine and track sounds instead of the base car's engine.");
+		TrackVolume = Config.Bind("Effects", "TrackVolume", 0.6f, new ConfigDescription("Track clatter volume while the tank moves.", new AcceptableValueRange<float>(0f, 1f)));
 		RequireKit = Config.Bind("General", "RequireTankKit", true, "Page Up only calls in a tank when you carry a Tank Kit (built at a workbench), and uses the kit up. Off = free call-ins, limited by MaxTanks.");
 		CrewSafe = Config.Bind("Armor", "CrewSafeFromOwnShells", true, "The tank's own shells can't hurt anyone inside a tank (driver and riders).");
 		CrewSafeRadius = Config.Bind("Armor", "CrewSafeRadius", 3f, "Anyone this close to a tank's centre counts as riding in it (tiles).");

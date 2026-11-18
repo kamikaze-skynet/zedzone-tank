@@ -24,14 +24,13 @@ KIT3_DESC = ("A heavier crate for the Battle Tank: a fully modelled main battle 
              "a 105 mm gun and a roof machine gun. Built at a workbench. Carry it and press Page Up to have it assembled "
              "in front of you; the kit is used up (a Battle Tank Kit is used before a Tank Kit).")
 # Iron Plate, Metal Component, Copper Tube, Iron Wire, Copper Wire
-KIT3_RECIPE = [(8, 80), (62, 30), (11, 15), (12, 25), (13, 15)]
+KIT3_RECIPE = KIT_RECIPE = [(8, 60), (62, 20), (11, 10), (12, 20), (13, 10)]
 NAME = "105 mm Tank Shell"
 DESC = ("A 105 mm high-explosive anti-tank round for the tank's main gun. A brass case full of propellant "
         "and a shaped-charge warhead with a long stand-off probe on the nose. Load it into the tank's cargo or "
         "carry it in your backpack; each shot uses one. Heavy: you won't carry many on foot.")
 
 # Iron Plate, Metal Component, Copper Tube, Iron Wire, Copper Wire
-KIT_RECIPE = [(8, 60), (62, 20), (11, 10), (12, 20), (13, 10)]
 
 W, H = 512, 128  # sprite, drawn pointing right (+x), nose at the right
 

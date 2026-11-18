@@ -426,8 +426,9 @@ internal static partial class Tank
 			if (k3 > 0 && Count(carried, k3) >= 1) { kitId = k3; d3 = true; }
 			else if (k1 > 0 && Count(carried, k1) >= 1) { kitId = k1; d3 = false; }
 			else if (k1 <= 0 && k3 <= 0) return Fail("The Tank Kit items didn't load (see BepInEx\\Tank.log)");
-			else return Fail("You need a Tank Kit or a Battle Tank Kit: build one at a workbench and carry it");
+			else return Fail(TankPlugin.HideClassic.Value ? "You need a Battle Tank Kit: build one at a workbench and carry it" : "You need a Tank Kit or a Battle Tank Kit: build one at a workbench and carry it");
 		}
+		if (TankPlugin.HideClassic.Value) d3 = true;
 		int max = TankPlugin.MaxTanks.Value;
 		if (!ignoreLimit && !useKit && max > 0 && _called >= max) return Fail($"This save has already called in {max} tank(s) (setting MaxTanks)");
 		Vector2 spot = here + new Vector2(0f, -5f);
@@ -774,6 +775,30 @@ internal static partial class Tank
 
 	// ------------------------------------------------------------------ per frame
 
+	private static float _recipeCheck;
+	private static bool _recipeLogged;
+
+	// Battle Tank only: take the old Tank Kit's recipe out of the crafting lists (checked now and
+	// then, in case the game registers mod recipes again).
+	private static void HideClassicRecipe()
+	{
+		if (!TankPlugin.HideClassic.Value) return;
+		float now = Time.realtimeSinceStartup;
+		if (now < _recipeCheck) return;
+		_recipeCheck = now + 5f;
+		try
+		{
+			int id = Bundled.KitId();
+			ItemManager im = ItemManager.instance;
+			if (id <= 0 || im == null) return;
+			var r = im.GetRecipeDatasById(id);
+			if (r == null || r.Length == 0) return;
+			im.UnregisterModRecipes(id);
+			if (!_recipeLogged) { _recipeLogged = true; TLog.Info($"Battle Tank only: old Tank Kit recipe removed ({r.Length})"); }
+		}
+		catch (Exception e) { if (!_recipeLogged) { _recipeLogged = true; TLog.Warn("hiding the Tank Kit recipe: " + e.Message); } }
+	}
+
 	public static void Tick(float dt)
 	{
 		GameController gc = GameController.instance;
@@ -789,6 +814,7 @@ internal static partial class Tank
 		catch { return; }
 		HumanCharacterController pc = gc.playerCharacter;
 		if (pc == null) return;
+		HideClassicRecipe();
 		if (sid != _saveId || gd != _gdPtr)
 		{
 			_saveId = sid;
@@ -862,6 +888,7 @@ internal static partial class Tank
 				Vis x = EnsureVis(v);
 				bool d3 = Is3D(v) && Model3D.Tick(v, x.TurretRel, now);
 				if (Is3D(v)) TankBase.Apply(v);
+				TankSound.Tick(v);
 				if (x.Hull.enabled == d3) { x.Hull.enabled = !d3; x.HullShadow.enabled = !d3; x.Turret.enabled = !d3; }
 				if (!d3)
 				{
@@ -902,6 +929,7 @@ internal static partial class Tank
 			try { if (_vis[k].Root != null) Object.Destroy(_vis[k].Root); } catch { }
 			_vis.Remove(k);
 			Model3D.Forget(k);
+			TankSound.Forget(k);
 		}
 	}
 
