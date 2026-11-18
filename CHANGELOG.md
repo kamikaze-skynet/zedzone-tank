@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.2
+
+- Grass the Battle Tank crushes grows back after a reload instead of being removed from the world save. Set BattleTankBase.CrushGrassPermanent = true to keep permanent tank trails.
+
 ## 1.5.1
 
 - The Battle Tank crushes the grass it drives over: every grass tile under the hull is removed for good, so tall grass no longer covers the tank. Pressing the grass (1.5.0) didn't work because the game only allows a few grass pressers at once. Config BattleTankBase.CrushGrass.

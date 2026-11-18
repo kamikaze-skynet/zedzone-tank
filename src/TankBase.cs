@@ -84,7 +84,7 @@ internal static class TankBase
 
 	// Tall grass is drawn over vehicles, and the game only presses it around a car's middle,
 	// so it buried the big tank. A tank crushes the grass it drives over instead: every grass
-	// tile under the hull is removed (and stays removed), like the tracks would.
+	// tile under the hull is removed (for good only with CrushGrassPermanent).
 	private static void PressGrass(BasicVehicle v, CapsuleCollider2D col, Orig o)
 	{
 		if (!TankPlugin.BasePressGrass.Value || col == null) return;
@@ -110,7 +110,12 @@ internal static class TankBase
 				}
 			int n = 0;
 			foreach (Vector2Int c in _tiles)
-				if (g.HasGrassAt(c)) { g.RemoveGrassPersistentAt(c, true); n++; }
+				if (g.HasGrassAt(c))
+				{
+					if (TankPlugin.BaseGrassPermanent.Value) g.RemoveGrassPersistentAt(c, true);
+					else g.RemoveGrassAt(c, true);
+					n++;
+				}
 			if (n > 0) g.FlushPendingVertexUploads();
 		}
 		catch (Exception e) { if (!_grassWarned) { _grassWarned = true; TLog.Warn("Tank base grass: " + e.Message); } }
