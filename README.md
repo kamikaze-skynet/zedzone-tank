@@ -2,6 +2,11 @@
 
 A drivable main battle tank for ZED ZONE. BepInEx IL2CPP plugin, GUID `girthy_mods.zedzone.tank`.
 
+## Requires
+
+- ZED ZONE (Windows, Steam)
+- [ZED ZONE Code Mod Loader](https://steamcommunity.com/sharedfiles/filedetails/?id=3834614258) - run its install.cmd once, then start the game through Steam.
+
 ## How to use
 
 - **Build menu:** open the Build menu, go to the **VEHICLES** tab and build the Battle Tank from the materials you carry (same cost as the kit).
