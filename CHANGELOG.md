@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.0
+
+- Spent casings come back to you (setting `Ammo.ReturnCasings`): every main gun shot gives a **105 mm Shell Casing**, every machine gun round gives its brass (.50 BMG Shell, 5.56x45 Shell or 7.62x39 Shell). They go onto a stack in your bag, then the tank's cargo, else into your bag (or at your feet when it's full).
+- New item: **105 mm Shell Casing**. Pressed from 4 Copper Plate at the reloader.
+- The 105 mm Tank Shell is now crafted at the reloader from 1 casing, 5 Gunpowder, 3 Nitric Acid Powder and 1 Iron Plate (makes 1).
+- The roof machine gun also takes **.50 BMG** rounds, and uses them first.
+- .50 BMG, 5.56 and 7.62x39 rounds get a reloader recipe from their casings when the game has none: 10 casings + Gunpowder (3 for .50 BMG, 1 for the others) + 1 Copper Plate makes 10 rounds (setting `Ammo.ReloadRecipes`). BepInEx\Tank.log says which recipes were added.
+
 ## 1.7.1
 
 - Build menu: the Battle Tank card and details show the tank picture instead of a borrowed bench icon.

@@ -13,7 +13,7 @@ namespace ZedTank;
 public class TankPlugin : BasePlugin
 {
 	public const string Guid = "girthy_mods.zedzone.tank";
-	public const string Version = "1.7.1";
+	public const string Version = "1.8.0";
 
 	internal static ManualLogSource L;
 
@@ -58,6 +58,8 @@ public class TankPlugin : BasePlugin
 	internal static ConfigEntry<float> NoiseRadius;
 	internal static ConfigEntry<float> FxScale;
 	internal static ConfigEntry<float> Volume;
+	internal static ConfigEntry<bool> ReturnCasings;
+	internal static ConfigEntry<bool> ReloadRecipes;
 
 	public override void Load()
 	{
@@ -101,7 +103,7 @@ public class TankPlugin : BasePlugin
 		RocketsIfNoShells = Config.Bind("MainGun", "RocketsIfNoShells", false, "If the 105 mm shell item fails to load, use the game's recoilless rockets as ammo instead.");
 		RocketDamage = Config.Bind("MainGun", "DirectHitDamageMultiplier", 1f, "Multiplies the rocket's direct hit damage (its blast is the game's own).");
 		RocketSpeed = Config.Bind("MainGun", "RocketSpeed", 0f, "Rocket speed. 0 = the game's recoilless launcher speed.");
-		MgNeedsAmmo = Config.Bind("MachineGun", "UseAmmo", true, "Each round uses one 5.56mm or 7.62x39mm round from the cargo or your backpack.");
+		MgNeedsAmmo = Config.Bind("MachineGun", "UseAmmo", true, "Each round uses one .50 BMG, 5.56mm or 7.62x39mm round from the cargo or your backpack (.50 BMG first).");
 		MgDamage = Config.Bind("MachineGun", "Damage", 400f, "Damage per round (it locks on to the hostile nearest the mouse; a normal zombie has about 1100 HP).");
 		MgRate = Config.Bind("MachineGun", "RoundsPerSecond", 9f, "Machine gun fire rate.");
 		MgAimRadius = Config.Bind("MachineGun", "AimRadius", 1.6f, "Lock-on range around the mouse pointer (tiles).");
@@ -110,6 +112,8 @@ public class TankPlugin : BasePlugin
 		NoiseRadius = Config.Bind("Effects", "NoiseRadius", 30f, "Zombies within this range hear the guns.");
 		FxScale = Config.Bind("Effects", "EffectScale", 2f, "Size of tracers, muzzle flashes and smoke.");
 		MgSoundWeapon = Config.Bind("Effects", "MachineGunSoundFrom", "", "Part of a gun's name (or fire sound name) to borrow the machine gun sound from, e.g. M249. Empty = pick a machine gun automatically. The choices are listed in BepInEx\\Tank.log.");
+		ReturnCasings = Config.Bind("Ammo", "ReturnCasings", true, "Spent casings go back to you: a 105 mm Shell Casing per main gun shot and the round's brass (.50 BMG / 5.56 / 7.62x39 Shell) per machine gun round. Craft new shells and bullets from them at the reloader.");
+		ReloadRecipes = Config.Bind("Ammo", "ReloadRecipes", true, "Give .50 BMG, 5.56 and 7.62x39 rounds a reloader recipe that uses their spent casings (10 casings + gunpowder + copper plate -> 10 rounds), unless the game already has one.");
 		Volume = Config.Bind("Effects", "Volume", 0.8f, new ConfigDescription("Gun volume.", new AcceptableValueRange<float>(0f, 1f)));
 		try
 		{
@@ -176,6 +180,7 @@ public class TankRunner : MonoBehaviour
 		Active = TankPlugin.Enabled.Value;
 		if (!Active) return;
 		try { BuildMenu.Tick(); } catch { }
+		try { Casings.Check(); } catch { }
 		try { Tank.Tick(Time.deltaTime); }
 		catch (Exception e) { TLog.Warn("tick: " + e.Message); }
 	}

@@ -13,8 +13,8 @@ A drivable main battle tank for ZED ZONE: a real 3D model with a turret that tur
 [*]Real tank sounds: diesel engine start-up, idle and a moving loop with the tracks.
 [*]Drives like the game's cars and [b]burns gasoline the same way[/b]. [b]Shift + Page Up[/b] next to it pours your gas cans in.
 [*]The [b]turret follows your mouse[/b].
-[*][b]Left click[/b]: main gun, fires 105 mm Tank Shells, a new ammo item (one per shot from the cargo or your backpack).
-[*][b]Right click[/b]: roof machine gun, locks on to the zombie nearest your mouse (5.56mm or 7.62x39mm rounds).
+[*][b]Left click[/b]: main gun, fires 105 mm Tank Shells, a new ammo item (one per shot from the cargo or your backpack). The empty 105 mm Shell Casing comes back to you: craft a new shell from it at the reloader.
+[*][b]Right click[/b]: roof machine gun, locks on to the zombie nearest your mouse (.50 BMG, 5.56mm or 7.62x39mm rounds). The spent brass comes back to you, so you can reload more bullets at the reloader.
 [*]Heavy armour: the crew takes a fraction of the damage they would in a car. Tall grass bends around it, trees in front still cover it.
 [/list]
 
