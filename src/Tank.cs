@@ -985,6 +985,7 @@ internal static partial class Tank
 			_cannonAt = now + 0.6f;
 			return;
 		}
+		if (TankPlugin.RocketsNeedAmmo.Value && Rockets.AmmoId == Bundled.ShellId()) Casings.Give(pc, v, Casings.CasingId());
 		// the barrel points along the turret's actual angle; the rocket leaves from its drawn tip
 		float ang = x.TurretWorld;
 		Vector2 dir = Dir(ang);
@@ -1008,7 +1009,7 @@ internal static partial class Tank
 
 	// The roof gun works like the helicopter's door gun: it locks on to the hostile nearest
 	// the mouse pointer and hits it directly, with a tracer.
-	private static readonly int[] MgAmmo = { 102, 104 };
+	private static readonly int[] MgAmmo = { 106, 102, 104 };
 
 	private static void FireMg(HumanCharacterController pc, BasicVehicle v, Vis x, List<InventoryData> boxes, float now)
 	{
@@ -1016,10 +1017,10 @@ internal static partial class Tank
 		if (TankPlugin.MgNeedsAmmo.Value)
 		{
 			bool got = false;
-			foreach (int id in MgAmmo) if (AutoIO.Take(boxes, id, 1f) >= 1f) { got = true; break; }
+			foreach (int id in MgAmmo) if (AutoIO.Take(boxes, id, 1f) >= 1f) { got = true; if (Casings.Brass.TryGetValue(id, out int brass)) Casings.Give(pc, v, brass); break; }
 			if (!got)
 			{
-				Msg("No machine gun ammo: put 5.56mm or 7.62x39mm rounds in the cargo or your backpack");
+				Msg("No machine gun ammo: put .50 BMG, 5.56mm or 7.62x39mm rounds in the cargo or your backpack");
 				_mgAt = now + 1f;
 				return;
 			}

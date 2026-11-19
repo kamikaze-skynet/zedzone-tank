@@ -12,6 +12,7 @@ internal static class Bundled
 	internal const string ShellGuid = "3f7c1d05-a105-4c2b-9e10-105a7a4c0105";
 	internal const string KitGuid = "9b2e4f1a-7a4c-4d1e-8c3b-7a4c0e7a4c01";
 	internal const string Kit3DGuid = "c3d0b7e1-5a4e-4f6b-9d2a-3d7a4c0e7a4c";
+	internal const string CasingGuid = Casings.CasingGuid;
 	private static bool _done;
 
 	internal static void LoadMissing(string when)
@@ -54,7 +55,7 @@ internal static class Bundled
 				catch (Exception e) { failed++; TLog.Warn("Bundled items: loading " + Path.GetFileName(file) + " failed: " + e.Message); }
 			}
 		}
-		TLog.Info($"Bundled items ({when}): {ok} loaded, {skipped} already loaded by the game, {failed} failed. 105 mm shell id {ShellId()}, Tank Kit id {KitId()}, Battle Tank Kit id {Kit3DId()}.");
+		TLog.Info($"Bundled items ({when}): {ok} loaded, {skipped} already loaded by the game, {failed} failed. 105 mm shell id {ShellId()}, Tank Kit id {KitId()}, Battle Tank Kit id {Kit3DId()}, 105 mm casing id {CasingId()}.");
 		if (ok > 0)
 		{
 			try { ModLocaleManager.ReapplyAllLocales(); } catch { }
@@ -69,6 +70,9 @@ internal static class Bundled
 
 	/// <summary>Runtime item id of the Battle Tank Kit (3D model), or -1.</summary>
 	internal static int Kit3DId() => IdOf(Kit3DGuid);
+
+	/// <summary>Runtime item id of the 105 mm Shell Casing, or -1.</summary>
+	internal static int CasingId() => IdOf(CasingGuid);
 
 	private static int IdOf(string guid)
 	{

@@ -25,10 +25,17 @@ KIT3_DESC = ("A heavier crate for the Battle Tank: a fully modelled main battle 
              "in front of you; the kit is used up (a Battle Tank Kit is used before a Tank Kit).")
 # Iron Plate, Metal Component, Copper Tube, Iron Wire, Copper Wire
 KIT3_RECIPE = KIT_RECIPE = [(8, 60), (62, 20), (11, 10), (12, 20), (13, 10)]
+CASE_GUID = "105ca5e0-7a4c-4b2d-9e10-105a7a4c0108"
+CASE_RID = 881108  # the shell recipe names this id; the plugin follows it if the loader remaps it
+CASE_NAME = "105 mm Shell Casing"
+CASE_DESC = ("The empty brass case of a fired 105 mm tank shell. The tank hands one back after every main gun shot. "
+             "Take it to the reloader with gunpowder, nitric acid powder and an iron plate to make a new shell. "
+             "New casings are pressed from copper plate at the reloader.")
 NAME = "105 mm Tank Shell"
 DESC = ("A 105 mm high-explosive anti-tank round for the tank's main gun. A brass case full of propellant "
         "and a shaped-charge warhead with a long stand-off probe on the nose. Load it into the tank's cargo or "
-        "carry it in your backpack; each shot uses one. Heavy: you won't carry many on foot.")
+        "carry it in your backpack; each shot uses one and gives the empty casing back. Crafted at the reloader "
+        "from a 105 mm Shell Casing. Heavy: you won't carry many on foot.")
 
 # Iron Plate, Metal Component, Copper Tube, Iron Wire, Copper Wire
 
@@ -63,6 +70,15 @@ def draw_shell(scale=1):
     box(430, 488, 5, (70, 74, 70, 255))
     d.polygon([(488 * s, cy - 8 * s), (504 * s, cy), (488 * s, cy + 8 * s)], fill=(60, 62, 58, 255), outline=(20, 20, 20, 255))
     return im
+
+def draw_casing():
+    # the shell's brass case and rim only, open at the neck
+    full = draw_shell(1)
+    case = full.crop((0, 0, 256, H))
+    d = ImageDraw.Draw(case)
+    cy = H // 2
+    d.ellipse([244, cy - 22, 256, cy + 22], fill=(70, 52, 20, 255))  # open mouth
+    return case
 
 def draw_kit(body=(92, 100, 56, 255), title="TANK KIT"):
     im = Image.new("RGBA", (256, 192), (0, 0, 0, 0))
@@ -126,13 +142,28 @@ def main():
         "itemRarity": 0.9, "hiddenItem": False, "itemInventorySizeX": 4, "itemInventorySizeY": 1,
         "generateItemInRoom": True, "generateItemInField": False, "generateItemInCoastFloat": 0.0,
         "weight": 2.5, "itemPrice": 400.0, "stackNumber": 4,
-        # Same explosive ingredients as the Boltgun round, plus iron plate (8) for the shell body.
-        "craftRecipeItems": [{"itemId": 7, "itemNumber": 10.0}, {"itemId": 75, "itemNumber": 5.0}, {"itemId": 8, "itemNumber": 3.0}],
-        "craftPlatform": 3, "craftAudioType": 0, "craftOutputNumber": 2,
+        # One spent casing, propellant (Gunpowder 7, Nitric Acid Powder 75) and iron plate (8) for the warhead.
+        "craftRecipeItems": [{"itemId": CASE_RID, "itemNumber": 1.0}, {"itemId": 7, "itemNumber": 5.0},
+                             {"itemId": 75, "itemNumber": 3.0}, {"itemId": 8, "itemNumber": 1.0}],
+        "craftPlatform": 3, "craftAudioType": 0, "craftOutputNumber": 1,
         "repairRecipeItems": [{"itemId": 56, "itemNumber": 1.0}],
         "ammoNumber": 2, "ammoBaseDamage": 3000.0,
     }
     pack("shell105", "Ammo", d, shell, preview_of(shell, (480, 120), "105 mm"))
+
+    case = draw_casing()
+    c = dict(d)
+    c.update({"modGuid": CASE_GUID, "runtimeId": CASE_RID, "ppu": 640,
+              "spriteRegions": [{"slotName": "Main", "region": {"x": 6, "y": 26, "w": 250, "h": 76}}],
+              "itemName": CASE_NAME, "itemName_EN": CASE_NAME, "itemDescription": CASE_DESC, "itemDescription_EN": CASE_DESC,
+              "itemRarity": 0.6, "itemInventorySizeX": 2, "itemInventorySizeY": 1, "generateItemInRoom": False,
+              "weight": 1.0, "itemPrice": 60.0, "stackNumber": 10,
+              # Copper Plate (9) pressed into a new case
+              "craftRecipeItems": [{"itemId": 9, "itemNumber": 4.0}],
+              "craftPlatform": 3, "craftOutputNumber": 1,
+              "repairRecipeItems": [{"itemId": 9, "itemNumber": 1.0}],
+              "ammoNumber": 1, "ammoBaseDamage": 0.0})
+    pack("casing105", "Ammo", c, case, preview_of(case, (400, 200), "105 mm casing"))
 
     kit = draw_kit()
     # The kit is an Ammo-type item only because that type is a plain stackable item; no gun uses it.
