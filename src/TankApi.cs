@@ -33,4 +33,12 @@ public static class TankApi
 	{
 		return Gas.GiveCans(count);
 	}
+
+	/// <summary>Other vehicle mods ask this before claiming a base car after a reload.
+	/// 1 = a tank is on record within 1 m of (x, y), 0 = no, -1 = the tank list for this save isn't loaded yet.</summary>
+	public static int TankSpot(float x, float y)
+	{
+		if (!TankRunner.Active) return 0;
+		return Tank.SpotState(new UnityEngine.Vector2(x, y));
+	}
 }

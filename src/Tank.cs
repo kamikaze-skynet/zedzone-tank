@@ -306,6 +306,21 @@ internal static partial class Tank
 		}
 	}
 
+	// For the Helicopter mod: is a tank on record at this spot? -1 = this save isn't loaded yet.
+	internal static int SpotState(Vector2 p)
+	{
+		try
+		{
+			GameController gc = GameController.instance;
+			if (gc == null || gc._gameData == null) return -1;
+			if (gc._gameData.createdDateTime != _saveId || gc._gameData.Pointer != _gdPtr) return -1;
+			for (int i = 0; i < _known.Count; i++)
+				if ((_known[i] - p).sqrMagnitude < 1f) return 1;
+			return 0;
+		}
+		catch { return -1; }
+	}
+
 	private static int Nearest(Vector2 p, float r, HashSet<int> skip)
 	{
 		int best = -1;

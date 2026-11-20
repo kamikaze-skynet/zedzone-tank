@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.1
+
+- Fixed a tank turning into a helicopter (with tank sounds) when the Helicopter mod is also loaded. The Helicopter mod now asks this mod where tanks are before it claims a vehicle.
+
 ## 1.8.0
 
 - Spent casings come back to you (setting `Ammo.ReturnCasings`): every main gun shot gives a **105 mm Shell Casing**, every machine gun round gives its brass (.50 BMG Shell, 5.56x45 Shell or 7.62x39 Shell). They go onto a stack in your bag, then the tank's cargo, else into your bag (or at your feet when it's full).
