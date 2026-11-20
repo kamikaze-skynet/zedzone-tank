@@ -3,6 +3,7 @@
 ## 1.8.1
 
 - Fixed a tank turning into a helicopter (with tank sounds) when the Helicopter mod is also loaded. The Helicopter mod now asks this mod where tanks are before it claims a vehicle.
+- Rebuilt for the 19 Nov 2026 game update (building or calling in a tank failed with "Method not found").
 
 ## 1.8.0
 
