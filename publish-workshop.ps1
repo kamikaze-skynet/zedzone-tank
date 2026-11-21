@@ -27,14 +27,19 @@ $Content = Join-Path $PSScriptRoot "dist\content"
 $ModDir  = Join-Path $Content "Tank"
 $Preview = Join-Path $PSScriptRoot "workshop\preview.png"
 $IdFile  = Join-Path $PSScriptRoot "workshop\publishedfileid.txt"
-$Dll     = Join-Path $PSScriptRoot "src\bin\Release\net6.0\Tank.dll"
+$BuiltDll = Join-Path $PSScriptRoot "src\bin\Release\net6.0\Tank.dll"
+$ShipDll  = Join-Path $Source "Tank.dll"   # a ready build dropped here (used with -SkipBuild)
 
 # ---- 1. build and stage the item folder
 if (-not $SkipBuild) {
     dotnet build src\Tank.csproj -c Release "-p:GameDir=$GameDir"
     if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 }
-if (-not (Test-Path $Dll)) { throw "Missing $Dll - build first" }
+# Use the newest Tank.dll: your own build, or one placed in workshop\content\Tank.
+$Dll = @($BuiltDll, $ShipDll) | Where-Object { Test-Path $_ } |
+    Sort-Object { [System.Reflection.AssemblyName]::GetAssemblyName($_).Version }, { (Get-Item $_).LastWriteTimeUtc } |
+    Select-Object -Last 1
+if (-not $Dll) { throw "No Tank.dll found - build first (or put one in workshop\content\Tank)" }
 $Version = [System.Reflection.AssemblyName]::GetAssemblyName($Dll).Version.ToString(3)
 if (Test-Path $Content) { Remove-Item $Content -Recurse -Force }
 New-Item -ItemType Directory -Force $ModDir | Out-Null
@@ -46,7 +51,7 @@ $modJson = Join-Path $ModDir "mod.json"
 $json = Get-Content $modJson -Raw
 $json = $json -replace '"version"\s*:\s*"[^"]*"', ('"version": "' + $Version + '"')
 [System.IO.File]::WriteAllText($modJson, $json, (New-Object System.Text.UTF8Encoding($false)))
-Write-Host "==> Staged Tank $Version in dist\content\Tank" -ForegroundColor Cyan
+Write-Host "==> Staged Tank $Version in dist\content\Tank (from $Dll)" -ForegroundColor Cyan
 
 # ---- 2. SteamCMD (downloaded once into tools\steamcmd)
 $Tools = Join-Path $PSScriptRoot "tools\steamcmd"
@@ -104,22 +109,16 @@ function Get-ItemUpdated([string]$itemId) {
         return [long]$r.response.publishedfiledetails[0].time_updated
     } catch { return 0 }
 }
-$before = if ($isNew) { 0 } else { Get-ItemUpdated $Id }
-
-& $SteamCmd +login $SteamUser +workshop_build_item $Vdf +quit
+& $SteamCmd +login $SteamUser +workshop_build_item $Vdf +quit | Tee-Object -Variable steamOut
 $steamExit = $LASTEXITCODE
+$steamText = ($steamOut | Out-String)
 
-# SteamCMD writes the item id back into the VDF after a successful upload.
+# SteamCMD can exit normally after "ERROR (Access Denied)", so read what it printed.
+# It writes the item id back into the VDF after a successful upload.
 $after = Get-Content $Vdf -Raw
 $failed = $false
-if ($after -match '"publishedfileid"\s+"(\d+)"' -and $Matches[1] -ne "0" -and -not $isNew) {
-    # SteamCMD prints "ERROR (Access Denied)" and still exits normally, so check
-    # with Steam that the item really changed.
-    Start-Sleep -Seconds 3
-    $now = Get-ItemUpdated $Id
-    if ($before -gt 0 -and $now -gt 0 -and $now -le $before) { $failed = $true }
-}
-if ($steamExit -ne 0) { $failed = $true }
+if ($steamText -match 'ERROR|Access Denied|Login Failure|FAILED') { $failed = $true }
+if ($steamText -notmatch 'Committing update\.*\s*Success') { $failed = $true }
 if (-not $failed -and $after -match '"publishedfileid"\s+"(\d+)"' -and $Matches[1] -ne "0") {
     $newId = $Matches[1]
     if ($isNew) {
