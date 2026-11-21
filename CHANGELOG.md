@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.2
+
+- Fixed the Battle Tank being invisible after loading a save (or loading another one) in the same game session. The game freed the tank's 3D model while the save loaded; the model is now kept, and read again if it was freed anyway.
+
 ## 1.8.1
 
 - Fixed a tank turning into a helicopter (with tank sounds) when the Helicopter mod is also loaded. The Helicopter mod now asks this mod where tanks are before it claims a vehicle.

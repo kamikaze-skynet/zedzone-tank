@@ -231,6 +231,9 @@ internal static class Model3D
 		m.RecalculateBounds();
 		var p = new Part { Mesh = m };
 		p.Mats.AddRange(order);
+		// keep it through save loads: the game unloads unused assets when a save loads, and a mesh
+		// no tank is using at that moment would be emptied (the tank then draws nothing)
+		m.hideFlags = HideFlags.HideAndDontSave;
 		Object.DontDestroyOnLoad(m);
 		TLog.Info($"3D model '{name}': {verts.Count / 3} triangles, materials {string.Join(",", order)}, bounds {m.bounds.size}");
 		return p;
@@ -238,7 +241,14 @@ internal static class Model3D
 
 	private static bool Load()
 	{
-		if (_hull != null && _turret != null) return true;
+		if (_hull != null && _turret != null && Alive(_hull) && Alive(_turret)) return true;
+		if (_hull != null || _turret != null)
+		{
+			// unloaded by the game (older builds, or anything else that freed it): read the files again
+			TLog.Warn("3D model meshes were unloaded; loading them again");
+			_hull = _turret = null;
+			_loadTried = false;
+		}
 		if (_loadTried) return false;
 		_loadTried = true;
 		try
@@ -250,6 +260,11 @@ internal static class Model3D
 		}
 		catch (Exception e) { TLog.Warn("3D model load: " + e); }
 		return _hull != null && _turret != null;
+	}
+
+	private static bool Alive(Part p)
+	{
+		try { return p.Mesh != null && p.Mesh.vertexCount > 0; } catch { return false; }
 	}
 
 	// ------------------------------------------------------------------ attaching to a car
