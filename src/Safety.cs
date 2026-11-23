@@ -14,16 +14,16 @@ internal static class Safety
 	private static bool _currentFromTank;
 	private static readonly List<Vector3> _blasts = new List<Vector3>(); // x, y, time of our shells' detonations
 	private static int _logged;
+	private static bool _blastHook;
 
 	internal static void Patch(Harmony h)
 	{
 		int ok = 0;
 		try
 		{
-			var it = typeof(BasicExplosion).GetNestedType("_ExplodeDamage_d__69");
-			var mn = it == null ? null : AccessTools.Method(it, "MoveNext");
-			if (mn != null) { h.Patch(mn, new HarmonyMethod(typeof(Safety), nameof(MoveNextPre)), new HarmonyMethod(typeof(Safety), nameof(MoveNextPost))); ok++; }
-			else TLog.Warn("Safety: ExplodeDamage coroutine not found");
+			var mn = ExplodeCo.MoveNext();
+			if (mn != null) { h.Patch(mn, new HarmonyMethod(typeof(Safety), nameof(MoveNextPre)), new HarmonyMethod(typeof(Safety), nameof(MoveNextPost))); ok++; _blastHook = true; TLog.Info("Safety: blast hook on " + ExplodeCo.Type.Name); }
+			else TLog.Warn("Safety: ExplodeDamage coroutine not found (using the detonation time instead)");
 		}
 		catch (Exception e) { TLog.Warn("Safety: blast hook failed: " + e.Message); }
 		try
@@ -74,8 +74,7 @@ internal static class Safety
 		if (!TankPlugin.CrewSafe.Value) return;
 		try
 		{
-			var it = __instance.TryCast<BasicExplosion._ExplodeDamage_d__69>();
-			BasicExplosion ex = it?.__4__this;
+			BasicExplosion ex = ExplodeCo.Owner(__instance);
 			if (ex == null) return;
 			_current = ex;
 			_currentFromTank = FromTank(ex);
@@ -136,9 +135,23 @@ internal static class Safety
 		catch { return false; }
 	}
 
+	// Without the blast hook: one of our shells went off near here in the last moment.
+	private static bool RecentBlastNear(Vector2 p)
+	{
+		float now = Time.time;
+		foreach (Vector3 b in _blasts)
+			if (now - b.z < 1.5f && ((Vector2)b - p).sqrMagnitude < 64f) return true;
+		return false;
+	}
+
 	private static bool OnHitPre(HumanCharacterController __instance, ref bool __result)
 	{
-		if ((_current == null && !_directOn) || !_currentFromTank) return true;
+		bool fromTank = (_current != null || _directOn) && _currentFromTank;
+		if (!fromTank && !_blastHook && TankPlugin.CrewSafe.Value)
+		{
+			try { fromTank = RecentBlastNear(__instance.transform.position); } catch { }
+		}
+		if (!fromTank) return true;
 		if (!InTank(__instance)) return true;
 		if (_logged++ < 5) TLog.Info("Safety: a tank shell hit on a crew member was blocked");
 		__result = false;
