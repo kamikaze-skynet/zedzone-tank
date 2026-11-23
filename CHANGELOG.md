@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.3
+
+- Fixed for the 22 Nov 2026 game update (1.0.22): the game renamed its explosion routine, so the hook that keeps the tank's own shells from hitting its crew stopped working, and the driver could be hit by their own main gun. It is now found by name, so future game updates don't break it again. If it ever can't be found, shells that just went off nearby still can't hurt the crew.
+
 ## 1.8.2
 
 - Fixed the Battle Tank being invisible after loading a save (or loading another one) in the same game session. The game freed the tank's 3D model while the save loaded; the model is now kept, and read again if it was freed anyway.
